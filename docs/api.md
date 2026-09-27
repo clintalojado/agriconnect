@@ -28,6 +28,15 @@ Malformed JSON request bodies return `400` (handled by Express's JSON parser).
 
 `GET /health` → `{ status: "ok" }`
 
+## Locations
+
+`GET /locations` → `{ municipality: "M'lang", barangays: [...] }` — the 37
+official barangays of M'lang, used for form suggestions. Barangays saved on
+farmers, suppliers (including `coverage_barangays`), and read from messages
+are normalized to these spellings ("pulang lupa" → `Pulang-lupa`), and the
+NLP recognizes them even without "Brgy." in front. Other barangays are
+accepted as typed.
+
 ## Farmers
 
 New farmers start as `verification_status: "pending"` (unless

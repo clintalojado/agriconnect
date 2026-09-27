@@ -5,6 +5,7 @@
 // for the farmer to double-check.
 
 const { PRODUCTS, NUMBER_WORDS, MONTHS, LANGUAGE_MARKERS, canonicalUnit } = require("./lexicon");
+const { findBarangayInText, isMlangBarangay, canonicalBarangay } = require("../locations");
 
 const INQUIRY_WORDS =
   /\b(magkano|pila|presyo|price|how much|available ba|naa ba|naa bay|meron ba|meron bang|may stock|stock ba|tag pila|do you have|is there)\b|\?\s*$/;
@@ -123,7 +124,14 @@ function titleCase(words) {
 
 function findBarangay(original) {
   const match = original.match(/\b(?:barangay|brgy\.?|bgy\.?|baryo|purok)\s+([A-Za-zÑñ0-9.'-]+(?:\s+[A-Za-zÑñ0-9.'-]+){0,2})/i);
-  if (!match) return null;
+  // Without a "brgy" marker, fall back to a known M'lang barangay named anywhere.
+  if (!match) return findBarangayInText(original);
+  // "brgy new rizal sunod semana" → the known name, not the words after it.
+  const after = match[1].split(/\s+/).map((w) => w.replace(/[.,!?]+$/, ""));
+  for (let n = after.length; n > 0; n--) {
+    const candidate = after.slice(0, n).join(" ");
+    if (isMlangBarangay(candidate)) return canonicalBarangay(candidate);
+  }
   const words = [];
   for (const word of match[1].split(/\s+/)) {
     const clean = word.replace(/[.,!?]+$/, "");
@@ -131,7 +139,7 @@ function findBarangay(original) {
     words.push(clean);
     if (word !== clean) break; // punctuation ends the name
   }
-  return words.length ? titleCase(words) : null;
+  return words.length ? canonicalBarangay(titleCase(words)) : null;
 }
 
 function isoDate(date) {

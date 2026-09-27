@@ -3,6 +3,7 @@ import { apiClient } from "../api/client";
 import { navigate } from "../lib/router";
 import { setIdentity } from "../lib/session";
 import { Alert, Button, Card, Field, Input, cx } from "../components/ui.jsx";
+import { BarangayInput } from "../components/BarangayInput.jsx";
 import { ArrowLeftIcon, CheckIcon, LeafMark, ShieldCheckIcon, SproutIcon, StoreIcon } from "../components/icons.jsx";
 
 const ROLE_CHOICES = [
@@ -17,7 +18,7 @@ const ROLE_CHOICES = [
 ];
 
 function FarmerForm({ onDone }) {
-  const [form, setForm] = useState({ name: "", phone_number: "", barangay: "", municipality: "" });
+  const [form, setForm] = useState({ name: "", phone_number: "", barangay: "", municipality: "M'lang" });
   const [farmer, setFarmer] = useState(null);
   const [otp, setOtp] = useState(null); // { dev_code?, phone }
   const [code, setCode] = useState("");
@@ -120,7 +121,7 @@ function FarmerForm({ onDone }) {
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Barangay">
-          <Input value={form.barangay} onChange={set("barangay")} required placeholder="Katipunan" />
+          <BarangayInput value={form.barangay} onChange={set("barangay")} required placeholder="Katipunan" />
         </Field>
         <Field label="Municipality">
           <Input value={form.municipality} onChange={set("municipality")} required placeholder="M'lang" />
@@ -172,14 +173,14 @@ function SupplierForm({ onDone }) {
           <Input value={form.phone} onChange={set("phone")} type="tel" inputMode="tel" placeholder="09XX XXX XXXX" />
         </Field>
         <Field label="Barangay">
-          <Input value={form.barangay} onChange={set("barangay")} />
+          <BarangayInput value={form.barangay} onChange={set("barangay")} />
         </Field>
         <Field label="Municipality">
           <Input value={form.municipality} onChange={set("municipality")} />
         </Field>
       </div>
       <Field label="Barangays you deliver to" hint="(comma-separated)">
-        <Input value={form.coverage_barangays} onChange={set("coverage_barangays")} placeholder="Katipunan, Poblacion, Batal" />
+        <Input value={form.coverage_barangays} onChange={set("coverage_barangays")} placeholder="Katipunan, Poblacion A, New Rizal" />
       </Field>
       <Button type="submit" size="lg" className="w-full" loading={busy}>
         Create store

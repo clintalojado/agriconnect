@@ -2,6 +2,7 @@ const { getDb } = require("../db/connection");
 const { samePhone } = require("../utils/phone");
 const { badRequest, notFound } = require("../utils/errors");
 const { listSupplierProducts } = require("./catalog.service");
+const { canonicalBarangay, canonicalBarangayList } = require("./locations");
 
 const SUPPLIER_STATS = `
   (SELECT ROUND(AVG(rating), 1) FROM reviews WHERE supplier_id = s.id) AS rating,
@@ -46,7 +47,7 @@ function findOrCreateSupplier({ name, contact_person, phone, coverage_barangays,
       `INSERT INTO suppliers (name, contact_person, phone, coverage_barangays, barangay, municipality)
        VALUES (?, ?, ?, ?, ?, ?)`
     )
-    .run(name.trim(), clean(contact_person), clean(phone), clean(coverage_barangays), clean(barangay), clean(municipality));
+    .run(name.trim(), clean(contact_person), clean(phone), clean(canonicalBarangayList(coverage_barangays)), clean(canonicalBarangay(barangay)), clean(municipality));
   return getSupplier(result.lastInsertRowid);
 }
 
@@ -64,7 +65,7 @@ function updateSupplier(id, { name, contact_person, phone, coverage_barangays, b
       `UPDATE suppliers SET name = ?, contact_person = ?, phone = ?, coverage_barangays = ?, barangay = ?, municipality = ?
        WHERE id = ?`
     )
-    .run(name.trim(), clean(contact_person), clean(phone), clean(coverage_barangays), clean(barangay), clean(municipality), id);
+    .run(name.trim(), clean(contact_person), clean(phone), clean(canonicalBarangayList(coverage_barangays)), clean(canonicalBarangay(barangay)), clean(municipality), id);
   return getSupplier(id);
 }
 

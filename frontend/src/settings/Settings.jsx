@@ -5,6 +5,7 @@ import { setIdentity, signOut, useSession } from "../lib/session";
 import { useProfile } from "../lib/profile.jsx";
 import { Alert, Button, Card, CardHeader, Field, Input, PageHeader, Skeleton, formatRelative } from "../components/ui.jsx";
 import { StatusBadge, VERIFICATION_STATUS } from "../components/status.jsx";
+import { BarangayInput } from "../components/BarangayInput.jsx";
 import { LogOutIcon, MessengerIcon, PhoneIcon, ShieldCheckIcon, SmsIcon, SproutIcon, StoreIcon } from "../components/icons.jsx";
 
 function PhoneVerification({ farmer, onVerified }) {
@@ -145,7 +146,7 @@ function FarmerSettings() {
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Barangay">
-              <Input value={form.barangay} onChange={set("barangay")} required />
+              <BarangayInput value={form.barangay} onChange={set("barangay")} required />
             </Field>
             <Field label="Municipality">
               <Input value={form.municipality} onChange={set("municipality")} required />
@@ -245,7 +246,7 @@ function SupplierSettings() {
               <Input value={form.phone} onChange={set("phone")} type="tel" />
             </Field>
             <Field label="Barangay">
-              <Input value={form.barangay} onChange={set("barangay")} />
+              <BarangayInput value={form.barangay} onChange={set("barangay")} />
             </Field>
             <Field label="Municipality">
               <Input value={form.municipality} onChange={set("municipality")} />

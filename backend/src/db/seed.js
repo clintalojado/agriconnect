@@ -14,9 +14,9 @@ const SUPPLIERS = [
     name: "GreenFields Agri Supply",
     contact_person: "Rosa Villanueva",
     phone: "09170000101",
-    barangay: "Poblacion",
+    barangay: "Poblacion A",
     municipality: "M'lang",
-    coverage_barangays: "Katipunan, Poblacion, Batal, New Esperanza",
+    coverage_barangays: "Katipunan, Poblacion A, Poblacion B, Dalipe, New Esperanza",
     listings: {
       "Urea (46-0-0)": 1150,
       "Complete fertilizer (14-14-14)": 1080,
@@ -32,7 +32,7 @@ const SUPPLIERS = [
     phone: "09170000102",
     barangay: "Katipunan",
     municipality: "M'lang",
-    coverage_barangays: "Katipunan, Batal",
+    coverage_barangays: "Katipunan, Dalipe, New Rizal",
     listings: { "Urea (46-0-0)": 1100, "Rice seeds": 1200, "Chicken feed": 1020, "Organic fertilizer": 450 },
   },
   {
@@ -41,7 +41,7 @@ const SUPPLIERS = [
     phone: "09170000103",
     barangay: "Poblacion",
     municipality: "Kidapawan",
-    coverage_barangays: "Katipunan, Poblacion, New Esperanza",
+    coverage_barangays: "Katipunan, Poblacion B, New Esperanza",
     listings: {
       "Urea (46-0-0)": 1180,
       "Complete fertilizer (14-14-14)": 1060,
@@ -55,9 +55,9 @@ const SUPPLIERS = [
     name: "Datu Agri Supply",
     contact_person: "Tomas Datu",
     phone: "09170000104",
-    barangay: "Batal",
+    barangay: "Dalipe",
     municipality: "M'lang",
-    coverage_barangays: "Batal, Katipunan",
+    coverage_barangays: "Dalipe, Katipunan, Tibao",
     listings: { "Complete fertilizer (14-14-14)": 1095, "Insecticide": 650, "Herbicide": 540, "Ammophos (16-20-0)": 1250 },
   },
 ];

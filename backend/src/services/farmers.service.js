@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const { getDb } = require("../db/connection");
 const { samePhone } = require("../utils/phone");
 const { badRequest, notFound } = require("../utils/errors");
+const { canonicalBarangay } = require("./locations");
 
 const OTP_TTL_MINUTES = 10;
 const OTP_MAX_ATTEMPTS = 5;
@@ -63,7 +64,7 @@ function findOrCreateFarmer({ name, phone_number, barangay, municipality, messen
     .run(
       name.trim(),
       phone_number || null,
-      barangay.trim(),
+      canonicalBarangay(barangay),
       municipality.trim(),
       messenger_psid ? String(messenger_psid) : null,
       phone_verified ? 1 : 0,
@@ -92,7 +93,7 @@ function updateFarmer(id, { name, phone_number, barangay, municipality }) {
     `UPDATE farmers SET name = ?, phone_number = ?, barangay = ?, municipality = ?,
             phone_verified = CASE WHEN ? THEN 0 ELSE phone_verified END
      WHERE id = ?`
-  ).run(name.trim(), phone_number || null, barangay.trim(), municipality.trim(), phoneChanged ? 1 : 0, id);
+  ).run(name.trim(), phone_number || null, canonicalBarangay(barangay), municipality.trim(), phoneChanged ? 1 : 0, id);
   return getFarmer(id);
 }
 

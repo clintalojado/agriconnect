@@ -26,6 +26,7 @@ const messengerRoutes = require("./routes/messenger.routes");
 const notificationsRoutes = require("./routes/notifications.routes");
 const communityRoutes = require("./routes/community.routes");
 const adminRoutes = require("./routes/admin.routes");
+const locationsRoutes = require("./routes/locations.routes");
 const { errorHandler } = require("./middleware/errorHandler");
 
 const app = express();
@@ -66,6 +67,7 @@ app.use("/api/messenger", messengerRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/community", communityRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/locations", locationsRoutes);
 
 // Interactive API docs ("Try it out") for testing the live API.
 app.get("/api/openapi.json", (req, res) => res.json(openapiSpec));

@@ -46,6 +46,7 @@ function op(tag, summary, { query = [], body, description, status = 200 } = {}, 
 // [method, path, tag, summary, options]
 const routes = [
   ["get", "/health", "Health", "Server health check"],
+  ["get", "/locations", "Health", "Barangays of M'lang (for forms)"],
 
   ["get", "/products", "Products", "Marketplace products with lowest price", { query: [["category", ""], ["q", ""]] }],
   ["get", "/products/categories", "Products", "Product categories"],

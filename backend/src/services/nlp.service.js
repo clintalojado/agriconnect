@@ -4,6 +4,7 @@ const { betaZodOutputFormat } = require("@anthropic-ai/sdk/helpers/beta/zod");
 const { extractWithRules, isoDate } = require("./nlp/rules");
 const { canonicalProduct, canonicalUnit } = require("./nlp/lexicon");
 const { confirmationReply, clarificationQuestion, intentReply } = require("./nlp/replies");
+const { MLANG_BARANGAYS, canonicalBarangay } = require("./locations");
 
 // NLP_MODE:
 //   auto  (default) — Claude API, falling back to the offline rule-based parser
@@ -47,7 +48,7 @@ Fields:
 - product_name: the main farm input requested. Use these canonical names when they apply: "Urea (46-0-0)", "Complete fertilizer (14-14-14)", "Ammonium sulfate (21-0-0)", "Ammophos (16-20-0)", "Muriate of potash (0-0-60)", "Organic fertilizer", "Hybrid corn seeds", "Rice seeds", "Herbicide", "Insecticide", "Fungicide", "Hog grower feed", "Chicken feed". Otherwise a short clean product name. Null if none is mentioned.
 - quantity: the numeric amount of the main product, converting number words (e.g. "sampung" = 10, "napulo" = 10, "lima" = 5). Null if not stated.
 - unit: one of "sacks", "kg", "liters", "bottles", "packs" when it fits ("sako", "bag", "kaban" → "sacks"; "kilo" → "kg"; "litro" → "liters"), otherwise the stated unit. If a fertilizer count has no unit, use "sacks". Null if not stated and not inferable.
-- barangay: the barangay named in the message. Null if not stated (do not guess from the farmer's profile — that is filled in separately).
+- barangay: the barangay named in the message. Null if not stated (do not guess from the farmer's profile — that is filled in separately). Most farmers are in M'lang, Cotabato; when the message names one of its barangays (even misspelled or without "brgy"), use its official spelling: ${MLANG_BARANGAYS.join(", ")}.
 - preferred_date: the requested timing, kept close to the farmer's phrasing (e.g. "before May", "sunod buwan"). Null if not stated.
 - preferred_date_iso: your best-guess deadline for preferred_date as YYYY-MM-DD, using the date given in the message context ("before May" → the last day of April; "next month" → the 1st of next month; "tomorrow"/"ugma"/"bukas" → the next day). Null when preferred_date is null.
 - intent: "purchase_request" if the farmer wants to order or reserve inputs, "inquiry" if they are only asking about price or availability, "other" otherwise (greetings, complaints, unrelated).
@@ -156,6 +157,7 @@ function finalize(extraction, { profileBarangay, source }) {
     unit: canonicalUnit(item.unit) || item.unit,
   }));
 
+  result.barangay = canonicalBarangay(result.barangay);
   result.barangay_source = result.barangay ? "message" : null;
   if (!result.barangay && profileBarangay) {
     result.barangay = profileBarangay;
