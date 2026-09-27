@@ -7,8 +7,8 @@ Bisaya, or English. They compare quotations and track delivery to their barangay
 
 ## Live demo
 
-- **App:** https://agriconnect.onrender.com
-- **API test page (Swagger):** https://agriconnect.onrender.com/api/docs
+- **App:** https://agriconnect-61co.onrender.com
+- **API test page (Swagger):** https://agriconnect-61co.onrender.com/api/docs
   (open an endpoint → **Try it out** → **Execute**)
 
 Notes: the free server sleeps when idle, so the first request can take ~30
