@@ -1,0 +1,27 @@
+# Render Blueprint: one free web service that serves the API (/api),
+# the Swagger test page (/api/docs) and the built React app (/).
+# Deploy: Render dashboard → New → Blueprint → pick this repo → Apply.
+services:
+  - type: web
+    name: agriconnect
+    runtime: node
+    plan: free
+    buildCommand: cd frontend && npm ci && npm run build && cd ../backend && npm ci --omit=dev
+    startCommand: cd backend && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      # Offline rule-based parser; set NLP_MODE=auto and ANTHROPIC_API_KEY to use Claude.
+      - key: NLP_MODE
+        value: rules
+      # Texts are logged (GET /api/sms/log) instead of really sent.
+      - key: SMS_PROVIDER
+        value: console
+      - key: FARMER_VERIFICATION
+        value: auto
+      - key: SEED_DEMO
+        value: "true"
+      # The free plan has no persistent disk: data resets on every restart/redeploy.
+      - key: DB_PATH
+        value: /tmp/agriconnect.db
