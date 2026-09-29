@@ -12,9 +12,19 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "24"
-      # Offline rule-based parser; set NLP_MODE=auto and ANTHROPIC_API_KEY to use Claude.
+      # auto = Claude AI reads messages, falling back to the offline rule-based
+      # parser when ANTHROPIC_API_KEY is missing or the API is unavailable.
       - key: NLP_MODE
-        value: rules
+        value: auto
+      # Secrets: set these in the Render dashboard (Environment tab), never in git.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: MESSENGER_PAGE_TOKEN
+        sync: false
+      - key: MESSENGER_VERIFY_TOKEN
+        sync: false
+      - key: MESSENGER_APP_SECRET
+        sync: false
       # Texts are logged (GET /api/sms/log) instead of really sent.
       - key: SMS_PROVIDER
         value: console

@@ -22,6 +22,7 @@ const { sendToChannel, logInbound, CHANNELS } = require("./sms.service");
 const { notifyStaff } = require("./notifications.service");
 const { sendOtp } = require("./verification.service");
 const { normalizePhone } = require("../utils/phone");
+const { canonicalBarangay, findBarangayInText } = require("./locations");
 const { badRequest, notFound } = require("../utils/errors");
 const { money, perUnit } = require("../utils/format");
 
@@ -351,6 +352,12 @@ function registrationSummary(data) {
   return `Pangalan: ${data.name}\nBarangay: ${data.barangay}\nBayan: ${data.municipality}${data.phone ? `\nMobile: ${data.phone}` : ""}`;
 }
 
+// Stricter than looksLikeOrder: registration answers may contain numbers
+// ("Poblacion 2", "Zone 3"), so only quantities with units or product words count.
+function mentionsOrder(text) {
+  return /d+s*(sa+ko|sacks?|bags?|kilos?|kg|litro|liters?|bote|bottles?)|urea|abono|fertili|binhi|liso|seeds?|feeds?|pabili|palit|order/i.test(text || "");
+}
+
 function looksLikeOrder(text) {
   return /\d|sako|sack|kilo|kg|litro|urea|abono|fertili|binhi|liso|seed|feed|pakain|order|palit|bili/i.test(text || "");
 }
@@ -389,16 +396,33 @@ async function continueRegistration({ channel, sender, text, session }) {
   const data = { ...session.data };
   const answer = text.trim();
 
+  // An order sent mid-registration ("5 sako urea") is kept for after sign-up,
+  // and the question is asked again instead of saving the order as a name/place.
+  const askAgain = (question) => {
+    const pending = [session.pending_message, answer].filter((m) => m && mentionsOrder(m)).join("\n");
+    saveSession(channel, sender, { step: session.step, data, pending_message: pending || answer });
+    return {
+      reply: `Natanggap namin ang order ninyo — ipoproseso namin ito pagkatapos mag-register. ${question}`,
+      registration: "in_progress",
+    };
+  };
+
   switch (session.step) {
     case "name":
+      if (mentionsOrder(answer)) return askAgain("Ano po ang buong pangalan ninyo?");
       data.name = answer.slice(0, 80);
       saveSession(channel, sender, { step: "barangay", data });
       return { reply: `Salamat, ${data.name}! Saang barangay po kayo nakatira?`, registration: "in_progress" };
-    case "barangay":
-      data.barangay = answer.replace(/^(brgy\.?|barangay)\s+/i, "").slice(0, 80);
+    case "barangay": {
+      // A known M'lang barangay anywhere in the answer wins ("sa new rizal po" → New Rizal).
+      const known = findBarangayInText(answer);
+      if (!known && mentionsOrder(answer)) return askAgain("Saang barangay po kayo nakatira? (hal. Katipunan)");
+      data.barangay = known || canonicalBarangay(answer.replace(/^(brgy\.?|barangay)\s+/i, "").slice(0, 80));
       saveSession(channel, sender, { step: "municipality", data });
-      return { reply: "Saang bayan o munisipyo po?", registration: "in_progress" };
+      return { reply: "Saang bayan o munisipyo po? (hal. M'lang)", registration: "in_progress" };
+    }
     case "municipality":
+      if (mentionsOrder(answer)) return askAgain("Saang bayan o munisipyo po? (hal. M'lang)");
       data.municipality = answer.slice(0, 80);
       if (channel === "messenger") {
         saveSession(channel, sender, { step: "phone", data });
@@ -462,7 +486,9 @@ async function continueRegistration({ channel, sender, text, session }) {
   }
 }
 
-async function handleOneLineRegistration({ channel, sender, text }) {
+// `session` is set when REG arrives in the middle of the guided registration;
+// its saved first message is still processed once registration completes.
+async function handleOneLineRegistration({ channel, sender, text, session = null }) {
   const parts = text
     .replace(/^\s*(reg|register)\b[:\s]*/i, "")
     .split(",")
@@ -473,14 +499,19 @@ async function handleOneLineRegistration({ channel, sender, text }) {
     return { reply: "Mag-register tayo. Ano po ang buong pangalan ninyo?", registration: "in_progress" };
   }
   const [name, barangay, municipality, phone] = parts;
-  const data = { name, barangay: barangay.replace(/^(brgy\.?|barangay)\s+/i, ""), municipality, phone: phone || null };
+  const data = {
+    name,
+    barangay: canonicalBarangay(barangay.replace(/^(brgy\.?|barangay)\s+/i, "")),
+    municipality,
+    phone: phone || null,
+  };
   const farmer = await createRegisteredFarmer({ channel, sender, data });
   if (channel === "messenger" && data.phone && !farmer.phone_verified) {
     await sendOtp(farmer.id);
     saveSession(channel, sender, { step: "otp", data: { ...data, farmer_id: farmer.id } });
     return { farmer, reply: `Nagpadala kami ng 6-digit code sa ${data.phone}. I-reply dito ang code (o SKIP).`, registration: "otp" };
   }
-  return finishRegistration({ channel, sender, farmer, session: null });
+  return finishRegistration({ channel, sender, farmer, session });
 }
 
 // ---------- Entry point ----------
@@ -504,6 +535,9 @@ async function handleInbound({ channel, sender, text }) {
 
   if (["HELP", "TULONG", "TABANG", "INFO"].includes(keyword)) {
     outcome = { reply: HELP_TEXT };
+  } else if (["REG", "REGISTER"].includes(keyword) && !farmer && session && session.step !== "otp") {
+    // "REG Name, Barangay, Town" in the middle of the guided questions.
+    outcome = await handleOneLineRegistration({ channel, sender: from, text: message, session });
   } else if (session) {
     outcome = await continueRegistration({ channel, sender: from, text: message, session });
   } else if (["REG", "REGISTER"].includes(keyword)) {
