@@ -13,8 +13,10 @@ const router = express.Router();
 router.get("/webhook", (req, res) => {
   const expected = process.env.MESSENGER_VERIFY_TOKEN;
   if (expected && req.query["hub.mode"] === "subscribe" && req.query["hub.verify_token"] === expected) {
+    console.log("[messenger] webhook verified by Meta");
     return res.status(200).send(req.query["hub.challenge"]);
   }
+  console.warn("[messenger] webhook verification failed: verify token does not match MESSENGER_VERIFY_TOKEN");
   res.sendStatus(403);
 });
 
@@ -30,9 +32,17 @@ function validSignature(req) {
 }
 
 router.post("/webhook", (req, res) => {
-  if (!validSignature(req)) return res.sendStatus(401);
+  if (!validSignature(req)) {
+    console.warn("[messenger] webhook rejected: bad X-Hub-Signature-256 — check MESSENGER_APP_SECRET is the App secret (App settings → Basic), not the App ID");
+    return res.sendStatus(401);
+  }
   const body = req.body || {};
-  if (body.object !== "page") return res.sendStatus(404);
+  if (body.object !== "page") {
+    console.warn(`[messenger] webhook ignored: object "${body.object}" (expected "page")`);
+    return res.sendStatus(404);
+  }
+  const events = (body.entry || []).reduce((n, e) => n + (e.messaging || []).length, 0);
+  console.log(`[messenger] webhook received ${events} event(s)`);
 
   // Acknowledge right away; Meta retries if the webhook is slow.
   res.status(200).send("EVENT_RECEIVED");
