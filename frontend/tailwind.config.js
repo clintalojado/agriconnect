@@ -84,6 +84,10 @@ export default {
           from: { transform: "scaleX(0)" },
           to: { transform: "scaleX(1)" },
         },
+        "ken-burns": {
+          from: { transform: "scale(1.02) translate(0, 0)" },
+          to: { transform: "scale(1.14) translate(-2%, -1%)" },
+        },
       },
       animation: {
         "fade-in-up": "fade-in-up 0.25s ease-out both",
@@ -98,6 +102,7 @@ export default {
         "typing-dot": "typing-dot 1.2s ease-in-out infinite",
         "gradient-x": "gradient-x 6s ease infinite",
         "draw-line": "draw-line 1.2s cubic-bezier(0.22, 1, 0.36, 1) both",
+        "ken-burns": "ken-burns 24s ease-in-out infinite alternate",
       },
     },
   },

@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { cx } from "./ui.jsx";
 
-// Illustrated product thumbnails (no photos needed): a sack for fertilizer
-// and feeds, a seed bag, a bottle for pesticides. The product's grade or
-// short name is printed on the label.
+// Product thumbnails: a real photo when we have one, otherwise an
+// illustration — a sack for fertilizer and feeds, a seed bag, a bottle for
+// pesticides, with the product's grade or short name on the label.
 
 const PALETTES = {
   fertilizer: { bg: "from-sky-50 to-sky-100", body: "#f8fafc", band: "#2a78d6", ink: "#184f95" },
@@ -69,11 +70,53 @@ function Bottle({ p, label }) {
   );
 }
 
+// Real photos per catalog product (Wikimedia Commons, free licenses — see
+// public/images/credits.json). Products not listed use the illustration.
+const PHOTOS = {
+  "Urea (46-0-0)": "urea.jpg",
+  "Complete fertilizer (14-14-14)": "complete-14-14-14.jpg",
+  "Ammonium sulfate (21-0-0)": "ammonium-sulfate.jpg",
+  "Ammophos (16-20-0)": "ammophos.jpg",
+  "Muriate of potash (0-0-60)": "potash.jpg",
+  "Organic fertilizer": "organic-fertilizer.jpg",
+  "Rice seeds": "rice-seeds.jpg",
+  "Hybrid corn seeds": "corn-seeds.jpg",
+  Insecticide: "insecticide.jpg",
+  Herbicide: "herbicide.jpg",
+  Fungicide: "fungicide.jpg",
+  "Hog grower feed": "hog-feed.jpg",
+  "Chicken feed": "chicken-feed.jpg",
+};
+
+export function productPhoto(name) {
+  const file = PHOTOS[name];
+  return file ? `/images/products/${file}` : null;
+}
+
 export default function ProductArt({ product, className }) {
+  const name = product?.name || product?.product_name;
+  const [failed, setFailed] = useState(false);
+  const photo = !failed && productPhoto(name);
   const category = product?.category || "fertilizer";
   const p = PALETTES[category] || PALETTES.fertilizer;
-  const label = labelFor(product?.name || product?.product_name, product?.variant);
+  const label = labelFor(name, product?.variant);
   const Shape = category === "seeds" ? SeedBag : category === "pesticide" ? Bottle : Sack;
+
+  if (photo) {
+    return (
+      <div className={cx("overflow-hidden bg-stone-100", className)}>
+        <img
+          src={photo}
+          alt={name}
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailed(true)}
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={cx("flex items-center justify-center overflow-hidden bg-gradient-to-br", p.bg, className)}>
       <svg viewBox="0 0 80 80" className="h-[78%] w-[78%] drop-shadow-sm" role="img" aria-label={product?.name || "Product"}>

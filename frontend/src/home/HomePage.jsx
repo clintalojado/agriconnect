@@ -3,6 +3,7 @@ import { BASE_URL, apiClient } from "../api/client";
 import { navigate } from "../lib/router";
 import { setActiveRole, useSession } from "../lib/session";
 import ProcessFlow from "../components/ProcessFlow.jsx";
+import ProductArt, { productPhoto } from "../components/ProductArt.jsx";
 import { Reveal, prefersReducedMotion, useCountUp, useInView } from "../components/motion.jsx";
 import { Badge, Button, Card, Skeleton, cx, formatPeso } from "../components/ui.jsx";
 import {
@@ -263,6 +264,14 @@ const LEAVES = [
 function HeroBackdrop() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+      {/* Farmers planting rice below Mt. Iriga, Camarines Sur */}
+      <img
+        src="/images/home/hero-iriga.jpg"
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover motion-safe:animate-ken-burns"
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-brand-950/95 via-brand-900/75 to-brand-900/40" />
+      <div className="absolute inset-0 bg-gradient-to-t from-brand-950/80 via-transparent to-brand-950/30" />
       <div
         className="absolute inset-0"
         style={{
@@ -426,6 +435,146 @@ function BarangayMarquee() {
         </div>
       </div>
     </Reveal>
+  );
+}
+
+// Real photos of Filipino farming (Wikimedia Commons, see PhotoCredits).
+const FARM_PHOTOS = [
+  { src: "/images/home/rice-farmers.jpg", caption: "Rice farmers at work", place: "Philippines", span: "sm:col-span-2 sm:row-span-2" },
+  { src: "/images/home/palay-sacks-carabao.jpg", caption: "Sacks of palay by carabao", place: "Gapan, Nueva Ecija" },
+  { src: "/images/home/bohol-farmer.jpg", caption: "Tending the rice fields", place: "Bohol" },
+  { src: "/images/home/palay-drying.jpg", caption: "Drying the palay harvest", place: "Philippines" },
+  { src: "/images/home/carabao-nueva-ecija.jpg", caption: "Farmer and carabao", place: "Nueva Ecija" },
+];
+
+function FarmerGallery() {
+  return (
+    <section className="mb-20">
+      <SectionHeading
+        eyebrow="Para sa magsasakang Pilipino"
+        title="Built for the farmers who feed the country"
+        description="From the palay fields of Nueva Ecija to the barangays of M'lang — AgriConnect brings farm inputs to where the work happens."
+      />
+      <div className="grid auto-rows-[160px] grid-cols-2 gap-3 sm:auto-rows-[190px] sm:grid-cols-4">
+        {FARM_PHOTOS.map((photo, i) => (
+          <Reveal
+            key={photo.src}
+            delay={i * 90}
+            className={cx("group relative overflow-hidden rounded-2xl bg-stone-200 shadow-card", photo.span, i === 0 && "col-span-2")}
+          >
+            <img
+              src={photo.src}
+              alt={`${photo.caption}, ${photo.place}`}
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent opacity-80 transition-opacity group-hover:opacity-100" />
+            <div className="absolute inset-x-0 bottom-0 translate-y-1 p-3 text-white transition-transform duration-300 group-hover:translate-y-0 sm:p-4">
+              <p className={cx("font-bold leading-tight", i === 0 ? "text-lg sm:text-xl" : "text-sm")}>{photo.caption}</p>
+              <p className="mt-0.5 flex items-center gap-1 text-xs text-white/80">
+                <PinIcon className="h-3 w-3" /> {photo.place}
+              </p>
+            </div>
+          </Reveal>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// Catalog preview with real product photos and live lowest prices.
+function ProductShowcase({ onOrder }) {
+  const [products, setProducts] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .get("/products")
+      .then((list) => !cancelled && setProducts(list.filter((p) => productPhoto(p.name)).slice(0, 8)))
+      .catch(() => !cancelled && setProducts([]));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  if (products && products.length === 0) return null;
+
+  return (
+    <section className="mb-20">
+      <SectionHeading
+        eyebrow="What you can order"
+        title="Fertilizer, seeds, pesticides, and feeds"
+        description="Prices below are the lowest from verified suppliers right now. Request any of them in one message."
+      />
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        {(products || Array.from({ length: 8 }, (_, i) => ({ id: `s${i}` }))).map((p, i) => (
+          <Reveal key={p.id} delay={(i % 4) * 90}>
+            {products ? (
+              <button
+                type="button"
+                onClick={onOrder}
+                className="group block h-full w-full overflow-hidden rounded-2xl bg-white text-left shadow-card ring-1 ring-stone-200/80 transition duration-300 hover:-translate-y-1 hover:shadow-lift"
+              >
+                <div className="relative">
+                  <ProductArt product={p} className="aspect-[4/3] w-full" />
+                  <Badge tone="stone" className="absolute left-2 top-2 bg-white/90 capitalize backdrop-blur">
+                    {p.category}
+                  </Badge>
+                </div>
+                <div className="p-3.5">
+                  <p className="line-clamp-2 min-h-[2.5rem] text-sm font-bold leading-snug text-stone-900">{p.name}</p>
+                  {p.min_price != null ? (
+                    <p className="mt-1 text-sm font-extrabold text-brand-700">
+                      from {formatPeso(p.min_price)} <span className="text-xs font-medium text-stone-500">/ {p.price_unit || p.unit}</span>
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-xs font-medium text-stone-400">Ask suppliers for a quote</p>
+                  )}
+                </div>
+              </button>
+            ) : (
+              <Skeleton className="aspect-[4/5] w-full rounded-2xl" />
+            )}
+          </Reveal>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PhotoCredits() {
+  const [credits, setCredits] = useState(null);
+  return (
+    <details
+      className="w-full text-xs text-stone-400"
+      onToggle={(e) => {
+        if (e.currentTarget.open && !credits) {
+          fetch("/images/credits.json")
+            .then((r) => r.json())
+            .then(setCredits)
+            .catch(() => setCredits([]));
+        }
+      }}
+    >
+      <summary className="cursor-pointer font-semibold text-stone-500 hover:text-brand-700">Photo credits</summary>
+      <ul className="mt-2 grid gap-1 sm:grid-cols-2">
+        {(credits || []).map((c) => (
+          <li key={c.file} className="truncate">
+            <a href={c.source} target="_blank" rel="noreferrer" className="hover:text-brand-700 hover:underline">
+              {c.title.replace(/\.(jpe?g|png)$/i, "")}
+            </a>{" "}
+            by {c.author} ·{" "}
+            {c.licenseUrl ? (
+              <a href={c.licenseUrl} target="_blank" rel="noreferrer" className="hover:underline">
+                {c.license}
+              </a>
+            ) : (
+              c.license
+            )}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2">Photos from Wikimedia Commons, resized. Used under the licenses above.</p>
+    </details>
   );
 }
 
@@ -596,6 +745,8 @@ export default function HomePage() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <LiveStats />
         <BarangayMarquee />
+        <FarmerGallery />
+        <ProductShowcase onOrder={() => enter("farmer")} />
 
         {/* How it works */}
         <section className="mb-20">
@@ -771,13 +922,16 @@ export default function HomePage() {
           </div>
         </Reveal>
 
-        <footer className="flex flex-col items-center justify-between gap-2 border-t border-stone-200 py-6 text-xs text-stone-400 sm:flex-row">
-          <span className="flex items-center gap-1.5">
-            <LeafMark className="h-4 w-4 text-brand-500" /> AgriConnect · M'lang, Cotabato
-          </span>
-          <a href={`${BASE_URL}/docs`} className="font-semibold text-stone-500 hover:text-brand-700">
-            API documentation
-          </a>
+        <footer className="border-t border-stone-200 py-6 text-xs text-stone-400">
+          <div className="mb-3 flex flex-col items-center justify-between gap-2 sm:flex-row">
+            <span className="flex items-center gap-1.5">
+              <LeafMark className="h-4 w-4 text-brand-500" /> AgriConnect · M'lang, Cotabato
+            </span>
+            <a href={`${BASE_URL}/docs`} className="font-semibold text-stone-500 hover:text-brand-700">
+              API documentation
+            </a>
+          </div>
+          <PhotoCredits />
         </footer>
       </div>
     </div>

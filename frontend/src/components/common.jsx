@@ -61,7 +61,7 @@ export function ProductCard({ product, compact = false }) {
   }
 
   return (
-    <Card className="flex h-full flex-col overflow-hidden transition hover:-translate-y-0.5 hover:shadow-lift">
+    <Card className="group flex h-full flex-col overflow-hidden transition hover:-translate-y-0.5 hover:shadow-lift">
       <button type="button" onClick={open} className="block">
         <ProductArt product={product} className="aspect-[4/3] w-full" />
       </button>
