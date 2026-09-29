@@ -65,9 +65,10 @@ Examples:
 
 const client = new Anthropic();
 
-// Set once a request fails because no credentials are configured, so later
-// requests go straight to the rule-based parser instead of retrying the API.
-let credentialsMissing = false;
+// True when no API key is configured (or a request fails for lack of
+// credentials), so messages go straight to the rule-based parser instead of
+// trying the API first. Deployments without a key run fully offline.
+let credentialsMissing = !process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN;
 let lastEngine = null;
 
 function badRequest(message) {
