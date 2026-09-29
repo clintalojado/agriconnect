@@ -44,10 +44,60 @@ export default {
           "70%": { boxShadow: "0 0 0 18px rgba(47, 151, 99, 0)" },
           "100%": { boxShadow: "0 0 0 0 rgba(47, 151, 99, 0)" },
         },
+        // Homepage motion
+        rise: {
+          from: { opacity: "0", transform: "translateY(18px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "pop-in": {
+          "0%": { opacity: "0", transform: "translateY(10px) scale(0.96)" },
+          "100%": { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-10px)" },
+        },
+        blob: {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)" },
+          "33%": { transform: "translate(40px, -30px) scale(1.1)" },
+          "66%": { transform: "translate(-30px, 20px) scale(0.95)" },
+        },
+        "leaf-fall": {
+          "0%": { transform: "translate3d(0, -10vh, 0) rotate(0deg)", opacity: "0" },
+          "10%": { opacity: "0.7" },
+          "90%": { opacity: "0.5" },
+          "100%": { transform: "translate3d(60px, 110vh, 0) rotate(300deg)", opacity: "0" },
+        },
+        marquee: {
+          from: { transform: "translateX(0)" },
+          to: { transform: "translateX(-50%)" },
+        },
+        "typing-dot": {
+          "0%, 80%, 100%": { opacity: "0.3", transform: "translateY(0)" },
+          "40%": { opacity: "1", transform: "translateY(-3px)" },
+        },
+        "gradient-x": {
+          "0%, 100%": { backgroundPosition: "0% 50%" },
+          "50%": { backgroundPosition: "100% 50%" },
+        },
+        "draw-line": {
+          from: { transform: "scaleX(0)" },
+          to: { transform: "scaleX(1)" },
+        },
       },
       animation: {
         "fade-in-up": "fade-in-up 0.25s ease-out both",
         "ring-pulse": "ring-pulse 1.6s ease-out infinite",
+        rise: "rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both",
+        "pop-in": "pop-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both",
+        float: "float 5s ease-in-out infinite",
+        "float-slow": "float 7s ease-in-out infinite",
+        blob: "blob 18s ease-in-out infinite",
+        "leaf-fall": "leaf-fall linear infinite",
+        marquee: "marquee 45s linear infinite",
+        "typing-dot": "typing-dot 1.2s ease-in-out infinite",
+        "gradient-x": "gradient-x 6s ease infinite",
+        "draw-line": "draw-line 1.2s cubic-bezier(0.22, 1, 0.36, 1) both",
       },
     },
   },
