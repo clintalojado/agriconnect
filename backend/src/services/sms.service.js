@@ -7,7 +7,7 @@ const { sendMessengerText } = require("./messenger/provider");
 const { normalizePhone } = require("../utils/phone");
 const { badRequest } = require("../utils/errors");
 
-const CHANNELS = ["sms", "messenger"];
+const CHANNELS = ["sms", "messenger", "web"];
 
 function logMessage({ channel = "sms", direction, phone, body, provider, status, error = null, farmer_id = null, request_id = null }) {
   const db = getDb();
@@ -43,6 +43,8 @@ async function sendSms({ to, body, farmer_id = null, request_id = null }) {
 /** Reply on whichever channel the farmer used. Same never-throws contract as sendSms. */
 async function sendToChannel({ channel, to, body, farmer_id = null, request_id = null }) {
   if (channel === "sms") return sendSms({ to, body, farmer_id, request_id });
+  // Website chat: nothing to deliver — the chat window reads replies from this log.
+  if (channel === "web") return logMessage({ channel, direction: "outbound", phone: to, body, provider: "web", status: "sent", farmer_id, request_id });
   if (channel !== "messenger") throw badRequest(`Unknown channel "${channel}"`);
 
   const entry = { channel, direction: "outbound", phone: to, body, provider: "messenger", farmer_id, request_id };
@@ -61,7 +63,7 @@ function logInbound({ channel, sender, body, farmer_id }) {
     direction: "inbound",
     phone: sender,
     body,
-    provider: channel === "sms" ? getProvider().name : "messenger",
+    provider: channel === "sms" ? getProvider().name : channel,
     status: "received",
     farmer_id,
   });

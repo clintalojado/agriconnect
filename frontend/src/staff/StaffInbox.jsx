@@ -4,13 +4,15 @@ import { navigate } from "../lib/router";
 import { useRealtimeEvent } from "../lib/realtime.jsx";
 import { Alert, Avatar, Badge, Button, Card, EmptyState, Input, PageHeader, SkeletonList, cx, formatRelative, formatTime } from "../components/ui.jsx";
 import { INBOUND_STATUS, StatusBadge, VERIFICATION_STATUS } from "../components/status.jsx";
-import { CalendarIcon, ClipboardIcon, InboxIcon, MessengerIcon, PinIcon, PlusIcon, SmsIcon, SparkleIcon, TrashIcon, UsersIcon } from "../components/icons.jsx";
+import { CalendarIcon, ChatIcon, ClipboardIcon, InboxIcon, MessengerIcon, PinIcon, PlusIcon, SmsIcon, SparkleIcon, TrashIcon, UsersIcon } from "../components/icons.jsx";
 
 const UNITS = ["sacks", "bags", "kg", "liters", "bottles", "packs"];
 const OPEN = ["new", "needs_info", "awaiting_confirmation"];
 
 function ChannelIcon({ channel, className = "h-4 w-4" }) {
-  return channel === "messenger" ? <MessengerIcon className={cx(className, "text-sky-600")} /> : <SmsIcon className={cx(className, "text-harvest-500")} />;
+  if (channel === "messenger") return <MessengerIcon className={cx(className, "text-sky-600")} />;
+  if (channel === "web") return <ChatIcon className={cx(className, "text-brand-600")} />;
+  return <SmsIcon className={cx(className, "text-harvest-500")} />;
 }
 
 function Preview({ message, onChanged }) {
@@ -249,9 +251,10 @@ export default function StaffInbox() {
 
   const counts = data?.open_counts || {};
   const tabs = [
-    { key: "all", label: "All", count: (counts.sms || 0) + (counts.messenger || 0) },
+    { key: "all", label: "All", count: (counts.sms || 0) + (counts.messenger || 0) + (counts.web || 0) },
     { key: "messenger", label: "Messenger", count: counts.messenger || 0 },
     { key: "sms", label: "SMS", count: counts.sms || 0 },
+    { key: "web", label: "Website chat", count: counts.web || 0 },
   ];
   const selected = data?.items.find((i) => i.id === selectedId);
 
@@ -259,7 +262,7 @@ export default function StaffInbox() {
     <div>
       <PageHeader
         title="Incoming Messages"
-        description="Farmers' texts from SMS and Messenger, read by AI. Farmers confirm by replying OO — or process and publish for them."
+        description="Farmers' texts from SMS, Messenger, and the website chat, read by AI. Farmers confirm by replying OO — or process and publish for them."
         action={
           <Button variant="secondary" onClick={() => navigate("/simulator")}>
             Open simulator

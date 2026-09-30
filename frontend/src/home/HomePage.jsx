@@ -4,6 +4,7 @@ import { navigate } from "../lib/router";
 import { setActiveRole, useSession } from "../lib/session";
 import ProcessFlow from "../components/ProcessFlow.jsx";
 import ProductArt, { productPhoto } from "../components/ProductArt.jsx";
+import ChatWidget, { openChat } from "../components/ChatWidget.jsx";
 import { Reveal, prefersReducedMotion, useCountUp, useInView } from "../components/motion.jsx";
 import { Badge, Button, Card, Skeleton, cx, formatPeso } from "../components/ui.jsx";
 import {
@@ -717,6 +718,13 @@ export default function HomePage() {
                 {supplier ? "Open supplier app" : "I'm a supplier"}
               </Button>
             </div>
+            <button
+              type="button"
+              onClick={() => openChat()}
+              className="mt-4 inline-flex animate-rise items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/20 backdrop-blur transition [animation-delay:350ms] hover:bg-white/20"
+            >
+              <ChatIcon className="h-4 w-4" /> Chat with our bot now — no sign-up needed
+            </button>
             <ul className="mt-8 flex animate-rise flex-wrap gap-x-6 gap-y-2 text-sm text-brand-100/80 [animation-delay:400ms]">
               <li className="flex items-center gap-1.5">
                 <GlobeIcon className="h-4 w-4" /> Tagalog, Bisaya & English
@@ -927,13 +935,22 @@ export default function HomePage() {
             <span className="flex items-center gap-1.5">
               <LeafMark className="h-4 w-4 text-brand-500" /> AgriConnect · M'lang, Cotabato
             </span>
-            <a href={`${BASE_URL}/docs`} className="font-semibold text-stone-500 hover:text-brand-700">
-              API documentation
-            </a>
+            <span className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+              <a href="/privacy" className="font-semibold text-stone-500 hover:text-brand-700">
+                Privacy Policy
+              </a>
+              <a href="/data-deletion" className="font-semibold text-stone-500 hover:text-brand-700">
+                Data deletion
+              </a>
+              <a href={`${BASE_URL}/docs`} className="font-semibold text-stone-500 hover:text-brand-700">
+                API documentation
+              </a>
+            </span>
           </div>
           <PhotoCredits />
         </footer>
       </div>
+      <ChatWidget />
     </div>
   );
 }

@@ -9,13 +9,16 @@ const STAFF_KEY = "staff:all";
 
 /**
  * Text a farmer on the channel they can receive: SMS if they have a phone
- * number, else Messenger. Never throws (the transport logs failures).
+ * number, else Messenger, else the website chat. Never throws (the transport logs failures).
  */
 async function textFarmer(farmer, body, { request_id = null } = {}) {
   if (!farmer) return null;
   if (farmer.phone_number) return sendSms({ to: farmer.phone_number, body, farmer_id: farmer.id, request_id });
   if (farmer.messenger_psid) {
     return sendToChannel({ channel: "messenger", to: farmer.messenger_psid, body, farmer_id: farmer.id, request_id });
+  }
+  if (farmer.web_chat_id) {
+    return sendToChannel({ channel: "web", to: farmer.web_chat_id, body, farmer_id: farmer.id, request_id });
   }
   return null;
 }

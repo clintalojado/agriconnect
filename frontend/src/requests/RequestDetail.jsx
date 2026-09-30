@@ -221,7 +221,7 @@ export default function RequestDetail({ id }) {
           <Fact
             icon={request.channel === "messenger" ? MessengerIcon : request.channel === "sms" ? SmsIcon : BoxIcon}
             label="Sent via"
-            value={{ app: "AgriConnect app", sms: "SMS", messenger: "Messenger" }[request.channel]}
+            value={{ app: "AgriConnect app", sms: "SMS", messenger: "Messenger", web: "Website chat" }[request.channel]}
           />
           {request.notes && <Fact icon={ChatIcon} label="Notes" value={request.notes} />}
         </div>

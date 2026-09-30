@@ -85,6 +85,13 @@ const routes = [
       "Or register in one text: `REG Maria Santos, Katipunan, M'lang`, then send an order like `10 sako urea sa Katipunan bago mag May`, then `OO` to confirm.",
     body: { channel: "sms", sender: "09181234567", message: "REG Maria Santos, Katipunan, M'lang" },
   }],
+  ["post", "/chat/message", "SMS & Messenger intake", "Website chat: send a message to the bot", {
+    description:
+      "The public chat on the homepage — the same bot as SMS/Messenger. `session_id` is a random 16–64 character id " +
+      "the browser keeps; reuse it to continue the conversation. Rate-limited (20 messages/minute per session).",
+    body: { session_id: "demoSession1234567890", message: "paano mag order?" },
+  }],
+  ["get", "/chat/history", "SMS & Messenger intake", "Website chat: this session's messages", { query: [["session_id", "demoSession1234567890"], ["after_id", "0"]] }],
   ["get", "/inbound", "SMS & Messenger intake", "Staff inbox of incoming messages", { query: [["channel", ""], ["status", ""]] }],
   ["get", "/inbound/{id}", "SMS & Messenger intake", "One inbox item"],
   ["post", "/inbound/{id}/process", "SMS & Messenger intake", "Re-read a message with the NLP service"],

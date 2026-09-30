@@ -24,11 +24,13 @@ const ADDED_COLUMNS = [
   ["farm_input_requests", "preferred_supplier_id", "INTEGER REFERENCES suppliers(id)"],
   ["farm_input_requests", "inbound_message_id", "INTEGER REFERENCES inbound_messages(id)"],
   ["sms_messages", "channel", "TEXT NOT NULL DEFAULT 'sms'"], // the log also holds Messenger texts
+  ["farmers", "web_chat_id", "TEXT"], // browser id of a farmer who registered in the website chat
 ];
 
 // Indexes on added columns can only be created after the columns exist.
 const ADDED_INDEXES = [
   "CREATE INDEX IF NOT EXISTS idx_farmers_messenger_psid ON farmers(messenger_psid)",
+  "CREATE INDEX IF NOT EXISTS idx_farmers_web_chat_id ON farmers(web_chat_id)",
   "CREATE INDEX IF NOT EXISTS idx_requests_product_id ON farm_input_requests(product_id)",
 ];
 
@@ -57,8 +59,42 @@ function ensureColumn(db, table, column, definition) {
   return true;
 }
 
+// Tables whose channel CHECK predates the website chat ("web" channel).
+// SQLite can't alter a CHECK, so these are rebuilt once (same columns and
+// rows) using SQLite's documented create-copy-drop-rename procedure.
+const WEB_CHANNEL_TABLES = ["inbound_messages", "registration_sessions"];
+
+function allowWebChannel(db) {
+  for (const table of WEB_CHANNEL_TABLES) {
+    const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
+    if (!row || !row.sql.includes("('sms', 'messenger')")) continue;
+    const temp = `${table}_web_rebuild`;
+    const createTemp = row.sql
+      .replace(/CREATE TABLE\s+(IF NOT EXISTS\s+)?("?)\w+\2/i, `CREATE TABLE ${temp}`)
+      .replace("('sms', 'messenger')", "('sms', 'messenger', 'web')");
+    db.exec("PRAGMA foreign_keys = OFF");
+    try {
+      db.exec("BEGIN");
+      db.exec(`DROP TABLE IF EXISTS ${temp}`);
+      db.exec(createTemp);
+      db.exec(`INSERT INTO ${temp} SELECT * FROM ${table}`);
+      db.exec(`DROP TABLE ${table}`);
+      db.exec(`ALTER TABLE ${temp} RENAME TO ${table}`);
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    } finally {
+      db.exec("PRAGMA foreign_keys = ON");
+    }
+  }
+}
+
 function migrate({ quiet = false } = {}) {
   const db = getDb();
+  db.exec(fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8"));
+  allowWebChannel(db);
+  // Rebuilt tables lose their indexes; the schema's CREATE INDEX IF NOT EXISTS restores them.
   db.exec(fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8"));
 
   const added = new Set();

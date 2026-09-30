@@ -35,15 +35,32 @@ function findFarmerByMessengerId(psid) {
   return getDb().prepare("SELECT * FROM farmers WHERE messenger_psid = ?").get(String(psid)) || null;
 }
 
+function findFarmerByWebId(webChatId) {
+  if (!webChatId) return null;
+  return getDb().prepare("SELECT * FROM farmers WHERE web_chat_id = ?").get(String(webChatId)) || null;
+}
+
 /**
  * Registers a farmer, or returns the existing one with the same phone number.
  * `phone_verified` is set when the number is already proven — e.g. the
  * registration itself came in as an SMS from that number.
+ *
+ * A Messenger or website-chat registration only joins an existing profile by
+ * phone number when that number is proven; otherwise anyone could type
+ * another farmer's number and see their orders. An unproven number that
+ * already belongs to someone is left off the new profile.
  */
-function findOrCreateFarmer({ name, phone_number, barangay, municipality, messenger_psid = null, phone_verified = false }) {
+function findOrCreateFarmer({ name, phone_number, barangay, municipality, messenger_psid = null, web_chat_id = null, phone_verified = false }) {
   const db = getDb();
 
-  const existing = findFarmerByPhone(phone_number) || findFarmerByMessengerId(messenger_psid);
+  const byChannel = findFarmerByMessengerId(messenger_psid) || findFarmerByWebId(web_chat_id);
+  let byPhone = byChannel ? null : findFarmerByPhone(phone_number);
+  const chatRegistration = Boolean(messenger_psid || web_chat_id);
+  if (byPhone && chatRegistration && !phone_verified) {
+    byPhone = null;
+    phone_number = null;
+  }
+  const existing = byChannel || byPhone;
   if (existing) {
     if (messenger_psid && !existing.messenger_psid) {
       db.prepare("UPDATE farmers SET messenger_psid = ? WHERE id = ?").run(String(messenger_psid), existing.id);
@@ -57,9 +74,9 @@ function findOrCreateFarmer({ name, phone_number, barangay, municipality, messen
   const status = initialVerificationStatus();
   const result = db
     .prepare(
-      `INSERT INTO farmers (name, phone_number, barangay, municipality, messenger_psid, phone_verified,
+      `INSERT INTO farmers (name, phone_number, barangay, municipality, messenger_psid, web_chat_id, phone_verified,
                             verification_status, verified_at, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 'verified' THEN datetime('now') END, datetime('now'))`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 'verified' THEN datetime('now') END, datetime('now'))`
     )
     .run(
       name.trim(),
@@ -67,6 +84,7 @@ function findOrCreateFarmer({ name, phone_number, barangay, municipality, messen
       canonicalBarangay(barangay),
       municipality.trim(),
       messenger_psid ? String(messenger_psid) : null,
+      web_chat_id ? String(web_chat_id) : null,
       phone_verified ? 1 : 0,
       status,
       status
@@ -179,6 +197,7 @@ module.exports = {
   findOrCreateFarmer,
   findFarmerByPhone,
   findFarmerByMessengerId,
+  findFarmerByWebId,
   updateFarmer,
   listFarmers,
   createOtp,

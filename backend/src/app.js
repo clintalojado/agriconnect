@@ -27,9 +27,12 @@ const notificationsRoutes = require("./routes/notifications.routes");
 const communityRoutes = require("./routes/community.routes");
 const adminRoutes = require("./routes/admin.routes");
 const locationsRoutes = require("./routes/locations.routes");
+const chatRoutes = require("./routes/chat.routes");
 const { errorHandler } = require("./middleware/errorHandler");
 
 const app = express();
+// Behind Render's proxy: use the visitor's IP (X-Forwarded-For) for rate limits.
+app.set("trust proxy", 1);
 
 app.use(cors());
 // Keep the raw bytes too: the Messenger webhook signature is computed over them.
@@ -68,6 +71,7 @@ app.use("/api/notifications", notificationsRoutes);
 app.use("/api/community", communityRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/locations", locationsRoutes);
+app.use("/api/chat", chatRoutes);
 
 // Interactive API docs ("Try it out") for testing the live API.
 app.get("/api/openapi.json", (req, res) => res.json(openapiSpec));
@@ -77,6 +81,9 @@ app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openapiSpec, { customSiteT
 const frontendDist = path.join(__dirname, "../../frontend/dist");
 if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist));
+  // Plain HTML pages (readable without JavaScript — Meta's app review fetches them).
+  app.get("/privacy", (req, res) => res.sendFile(path.join(frontendDist, "privacy.html")));
+  app.get("/data-deletion", (req, res) => res.sendFile(path.join(frontendDist, "data-deletion.html")));
   app.get(/^(?!\/api(\/|$)).*/, (req, res) => res.sendFile(path.join(frontendDist, "index.html")));
 }
 

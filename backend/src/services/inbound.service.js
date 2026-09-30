@@ -15,6 +15,7 @@ const {
   findOrCreateFarmer,
   findFarmerByPhone,
   findFarmerByMessengerId,
+  findFarmerByWebId,
   hasPendingOtp,
   verifyOtp,
 } = require("./farmers.service");
@@ -46,7 +47,9 @@ const HELP_TEXT =
 // ---------- Helpers ----------
 
 function findFarmer(channel, sender) {
-  return channel === "sms" ? findFarmerByPhone(sender) : findFarmerByMessengerId(sender);
+  if (channel === "sms") return findFarmerByPhone(sender);
+  if (channel === "web") return findFarmerByWebId(sender);
+  return findFarmerByMessengerId(sender);
 }
 
 function decodeRow(row) {
@@ -453,6 +456,7 @@ async function createRegisteredFarmer({ channel, sender, data }) {
     phone_number: channel === "sms" ? sender : data.phone || null,
     phone_verified: channel === "sms",
     messenger_psid: channel === "messenger" ? sender : null,
+    web_chat_id: channel === "web" ? sender : null,
   });
   notifyStaff("verification", { farmer_id: farmer.id, status: farmer.verification_status });
   return farmer;
@@ -581,6 +585,43 @@ async function handleOneLineRegistration({ channel, sender, text, session = null
   return finishRegistration({ channel, sender, farmer, session });
 }
 
+// ---------- Data deletion (privacy policy / Meta data-deletion requirement) ----------
+
+const DELETE_REQUEST = /^\s*(delete my data|burahin ang (aking|akong) (data|impormasyon)|papara ang akong data)\s*[.!]*\s*$/i;
+const DELETE_CONFIRM = /^\s*confirm delete\s*[.!]*\s*$/i;
+const DELETE_CONFIRM_TEXT =
+  "Buburahin nito ang inyong pangalan, numero, at mga mensahe sa AgriConnect. I-reply ang CONFIRM DELETE para ituloy.\n" +
+  "This deletes your name, number, and messages from AgriConnect. Reply CONFIRM DELETE to continue.";
+
+/**
+ * Removes a sender's personal data: the farmer profile is anonymised (orders
+ * stay for suppliers' records, without a name or contact), and their message
+ * log, inbox entries, registration session, and notifications are erased.
+ */
+function deleteSenderData({ channel, sender, farmer }) {
+  const db = getDb();
+  db.exec("BEGIN");
+  try {
+    if (farmer) {
+      db.prepare(
+        `UPDATE farmers SET name = 'Deleted user', phone_number = NULL, messenger_psid = NULL, web_chat_id = NULL,
+                phone_verified = 0 WHERE id = ?`
+      ).run(farmer.id);
+      db.prepare("UPDATE inbound_messages SET body = '[deleted]', extraction = NULL, sender = '[deleted]' WHERE farmer_id = ?").run(farmer.id);
+      db.prepare("DELETE FROM sms_messages WHERE farmer_id = ?").run(farmer.id);
+      db.prepare("UPDATE farm_input_requests SET raw_message = '[deleted]' WHERE farmer_id = ?").run(farmer.id);
+      db.prepare("DELETE FROM notifications WHERE recipient_type = 'farmer' AND recipient_id = ?").run(farmer.id);
+    }
+    db.prepare("UPDATE inbound_messages SET body = '[deleted]', extraction = NULL, sender = '[deleted]' WHERE channel = ? AND sender = ?").run(channel, sender);
+    db.prepare("DELETE FROM sms_messages WHERE channel = ? AND phone = ?").run(channel, sender);
+    db.prepare("DELETE FROM registration_sessions WHERE channel = ? AND sender = ?").run(channel, sender);
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
 // ---------- Entry point ----------
 
 /**
@@ -602,6 +643,12 @@ async function handleInbound({ channel, sender, text }) {
 
   if (["HELP", "TULONG", "TABANG", "INFO"].includes(keyword)) {
     outcome = { reply: HELP_TEXT };
+  } else if (DELETE_REQUEST.test(message)) {
+    outcome = { reply: DELETE_CONFIRM_TEXT };
+  } else if (DELETE_CONFIRM.test(message)) {
+    deleteSenderData({ channel, sender: from, farmer });
+    farmer = null;
+    outcome = { reply: "Nabura na ang inyong personal na impormasyon sa AgriConnect. Salamat po. / Your personal data has been deleted." };
   } else if (["REG", "REGISTER"].includes(keyword) && !farmer && session && session.step !== "otp") {
     // "REG Name, Barangay, Town" in the middle of the guided questions.
     outcome = await handleOneLineRegistration({ channel, sender: from, text: message, session });

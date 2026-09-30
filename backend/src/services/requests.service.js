@@ -175,7 +175,7 @@ async function createStructuredRequest({
   if (preferred_supplier_id && !db.prepare("SELECT id FROM suppliers WHERE id = ?").get(preferred_supplier_id)) {
     throw badRequest("Unknown preferred_supplier_id");
   }
-  if (!["app", "sms", "messenger"].includes(channel)) throw badRequest("Invalid channel");
+  if (!["app", "sms", "messenger", "web"].includes(channel)) throw badRequest("Invalid channel");
 
   const result = db
     .prepare(

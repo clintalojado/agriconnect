@@ -261,10 +261,10 @@ CREATE TABLE IF NOT EXISTS reviews (
     created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- 18. Staff inbox — every text that arrives by SMS or Messenger
+-- 18. Staff inbox — every text that arrives by SMS, Messenger, or the website chat
 CREATE TABLE IF NOT EXISTS inbound_messages (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    channel       TEXT NOT NULL CHECK (channel IN ('sms', 'messenger')),
+    channel       TEXT NOT NULL CHECK (channel IN ('sms', 'messenger', 'web')),
     sender        TEXT NOT NULL,   -- phone number (sms) or page-scoped id (messenger)
     farmer_id     INTEGER REFERENCES farmers(id) ON DELETE SET NULL,
     body          TEXT NOT NULL,   -- follow-up texts are appended while the message is open
@@ -282,7 +282,7 @@ CREATE INDEX IF NOT EXISTS idx_inbound_status ON inbound_messages(status);
 -- 18b. Registration by SMS/Messenger, one question at a time (BPMN phase 1)
 CREATE TABLE IF NOT EXISTS registration_sessions (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
-    channel           TEXT NOT NULL CHECK (channel IN ('sms', 'messenger')),
+    channel           TEXT NOT NULL CHECK (channel IN ('sms', 'messenger', 'web')),
     sender            TEXT NOT NULL,
     step              TEXT NOT NULL,  -- name | barangay | municipality | phone | otp | confirm
     data              TEXT NOT NULL DEFAULT '{}',
