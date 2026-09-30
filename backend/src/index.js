@@ -19,4 +19,5 @@ if (process.env.SEED_DEMO === "true") require("./db/seed").seed();
 app.listen(PORT, () => {
   console.log(`AgriConnect backend listening on http://localhost:${PORT}`);
   scheduleAggregationJob();
+  require("./services/messenger/provider").setupMessengerProfile();
 });

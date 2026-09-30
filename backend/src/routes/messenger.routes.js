@@ -5,7 +5,7 @@
 const crypto = require("crypto");
 const express = require("express");
 const { handleInbound } = require("../services/inbound.service");
-const { showTyping } = require("../services/messenger/provider");
+const { showTyping, GET_STARTED } = require("../services/messenger/provider");
 
 const router = express.Router();
 
@@ -49,8 +49,9 @@ router.post("/webhook", (req, res) => {
 
   for (const entry of body.entry || []) {
     for (const event of entry.messaging || []) {
-      const text = event.message?.text;
-      if (!text || event.message.is_echo || !event.sender?.id) continue;
+      // Tapping "Get Started" (or a button) arrives as a postback, not a message.
+      const text = event.postback?.payload === GET_STARTED ? "Hello" : event.message?.text;
+      if (!text || event.message?.is_echo || !event.sender?.id) continue;
       showTyping(event.sender.id);
       handleInbound({ channel: "messenger", sender: event.sender.id, text }).catch((error) =>
         console.error(`[messenger] failed to handle message from ${event.sender.id}: ${error.message}`)

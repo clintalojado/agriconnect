@@ -49,4 +49,34 @@ async function showTyping(psid) {
   }
 }
 
-module.exports = { sendMessengerText, showTyping, isConfigured };
+// First-contact experience for people who open the Page's chat: a greeting
+// above the conversation and a "Get Started" button (its tap arrives as a
+// postback with payload GET_STARTED). Set once at startup; safe to repeat.
+const GET_STARTED = "GET_STARTED";
+
+async function setupMessengerProfile() {
+  if (!isConfigured()) return;
+  const version = process.env.MESSENGER_GRAPH_VERSION;
+  const url = `https://graph.facebook.com/${version ? `${version}/` : ""}me/messenger_profile?access_token=${encodeURIComponent(process.env.MESSENGER_PAGE_TOKEN)}`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        get_started: { payload: GET_STARTED },
+        greeting: [
+          {
+            locale: "default",
+            text: "Kumusta, {{user_first_name}}! 🌾 Mag-order ng abono, binhi, gamot, at feeds mula sa verified suppliers ng M'lang. Tagalog, Bisaya, o English — i-tap ang Get Started.",
+          },
+        ],
+      }),
+    });
+    if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
+    console.log("[messenger] Get Started button and greeting are set");
+  } catch (error) {
+    console.warn(`[messenger] could not set Get Started/greeting: ${error.message}`);
+  }
+}
+
+module.exports = { sendMessengerText, showTyping, isConfigured, setupMessengerProfile, GET_STARTED };

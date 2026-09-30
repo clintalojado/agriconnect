@@ -11,6 +11,18 @@ Until then, anyone can test the same bot in the website chat:
 Meta changes its dashboard often. If a button isn't where this guide says,
 look for the closest match.
 
+## Checklist
+
+- [x] Webhook connected, signature-checked, `messages` subscribed
+- [x] Privacy Policy and Data Deletion pages live; `DELETE MY DATA` works in the bot
+- [x] App icon ready (`docs/meta/app-icon-1024.png`)
+- [x] "Get Started" button and greeting (set automatically when the server starts)
+- [ ] Also tick **`messaging_postbacks`** in the Page's webhook subscriptions (so the Get Started tap reaches the bot)
+- [ ] App settings → Basic filled in (section 2)
+- [ ] Business verification (section 3)
+- [ ] App Review submitted with screen recording (section 4)
+- [ ] Switched to Live after approval (section 5)
+
 ## 1. Pages Meta asks for (already live)
 
 | Field | URL |
@@ -24,7 +36,7 @@ the bot (Messenger, SMS, or website chat).
 
 ## 2. App settings → Basic
 
-- **App icon:** 1024×1024 PNG (e.g. the green leaf logo on a white or green background).
+- **App icon:** upload [`docs/meta/app-icon-1024.png`](meta/app-icon-1024.png) (1024×1024, ready to use).
 - **Privacy Policy URL** and **User data deletion → Data deletion instructions URL:** from the table above.
 - **Category:** Business and pages (or Utility and productivity).
 - **Contact email:** an email you check.
