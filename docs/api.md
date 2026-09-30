@@ -151,6 +151,21 @@ open requests from verified farmers with no order yet, each with `nearby`,
   rules parser instead): `429` rate-limited, `500` misconfigured (missing or
   invalid `ANTHROPIC_API_KEY`), `502` upstream error or unparsable output.
 
+`POST /nlp/intent` — Body `{ message }` → `200 { message, intent, confidence,
+understood, ranking }`. The ML intent classifier: multinomial logistic
+regression over word unigrams/bigrams and character trigrams, trained on the
+labelled farmer messages in `backend/src/services/nlp/intent/dataset.js`
+(21 intents: order, price, availability, delivery_area, order_status,
+farming_advice, payment, complaint, …). `understood` is false below the
+confidence threshold. The chatbot uses it to route texts: orders go to the
+order parser; questions are answered from the knowledge base
+(`services/nlp/knowledge.js`) with live data (delivery coverage, order
+status, prices, AgriPoints); complaints, cancellations, requests for a person
+and unrecognised texts stay `new` in the staff inbox.
+
+`GET /nlp/intent/model` → algorithm, intents, training size, vocabulary size.
+Accuracy: `npm run nlp:eval` (held-out test set + 5-fold cross-validation).
+
 `GET /nlp/status` → `200 { mode, active_engine, last_engine }` — `mode` is
 `NLP_MODE`; `active_engine` is `ai` or `rules`; `last_engine` is what handled
 the most recent message (`null` before the first).

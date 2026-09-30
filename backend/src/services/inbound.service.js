@@ -9,6 +9,8 @@ const { getDb } = require("../db/connection");
 const { extractFarmInputRequest } = require("./nlp.service");
 const { detectLanguage } = require("./nlp/rules");
 const { describeOrder } = require("./nlp/replies");
+const { classifyIntent } = require("./nlp/intent");
+const { answerIntent, fallbackReply, KB_INTENTS } = require("./nlp/knowledge");
 const {
   findOrCreateFarmer,
   findFarmerByPhone,
@@ -285,20 +287,85 @@ async function publishInbound(id, { confirmed_by = "farmer", overrides = {} } = 
 
 // ---------- Order texts ----------
 
+// Questions a not-yet-registered sender can get answered right away. Anything
+// else (an order, a greeting, text we don't understand) starts registration.
+const GUEST_INTENTS = new Set([
+  "how_to_order", "delivery_area", "payment", "hours", "location", "about", "suppliers",
+  "farming_advice", "price", "availability", "points", "registration_help",
+]);
+
+function isGuestQuestion(text) {
+  if (mentionsOrder(text) && !/\?|magkano|pila|how much|presyo|price/i.test(text)) return false;
+  const ml = classifyIntent(text);
+  return ml.understood && GUEST_INTENTS.has(ml.intent);
+}
+
+// Intents that win over the order parser even when the text mentions sacks
+// ("kulang ng 2 sako ang deliver" is a complaint, not an order).
+const OVERRIDE_INTENTS = new Set(["complaint", "cancel_order", "order_status", "talk_to_human"]);
+
+/**
+ * Answers a question from the knowledge base as its own inbox entry, leaving
+ * any open order conversation untouched. Complaints, cancellations, requests
+ * for a person, and messages the bot didn't understand are left "new" so
+ * staff see them.
+ */
+function answerFromKnowledge({ farmer, channel, sender, text, ml, language }) {
+  const answer = ml.understood
+    ? answerIntent(ml.intent, { text, language, farmer, statusReply })
+    : { reply: fallbackReply(language), escalate: true };
+  const inbound = saveInbound({
+    channel,
+    sender,
+    farmer_id: farmer?.id ?? null,
+    body: text,
+    structured: { items: [], intent: ml.intent, language, source: "ml", confidence: ml.confidence, ml },
+    status: answer.escalate ? "new" : "answered",
+  });
+  return { inbound, reply: answer.reply, intent: ml };
+}
+
 async function processOrderText({ farmer, channel, sender, text, open }) {
   const merging = open && ["needs_info", "awaiting_confirmation"].includes(open.status);
   const body = merging ? `${open.body}\n${text}` : text;
   const extraction = await extractFarmInputRequest(body, { profileBarangay: farmer.barangay });
   const structured = toStructured(extraction);
+  // The ML intent model reads only the new text, not the merged conversation.
+  const ml = classifyIntent(text);
+  const language = extraction.language;
+  const hasProduct = structured.items.length > 0;
+  const hasQuantity = structured.items.some((i) => i.quantity != null);
+
+  if (ml.understood && OVERRIDE_INTENTS.has(ml.intent) && ml.confidence >= 0.45) {
+    return { ...answerFromKnowledge({ farmer, channel, sender, text, ml, language }), extraction };
+  }
+  // A question in the middle of an order ("magkano delivery?" before OO):
+  // answer it and remind the farmer about the pending order, without merging.
+  const questionIntent = ml.understood && KB_INTENTS.has(ml.intent) && !["order", "acknowledge"].includes(ml.intent);
+  if (merging && questionIntent && !mentionsOrder(text)) {
+    const answered = answerFromKnowledge({ farmer, channel, sender, text, ml, language });
+    const reminder = open.status === "awaiting_confirmation"
+      ? pick(language, { tagalog: "\n\nPaalala: i-reply ang OO para i-confirm ang order ninyo.", bisaya: "\n\nPahinumdom: i-reply ang OO aron i-confirm ang imong order.", english: "\n\nReminder: reply YES to confirm your order." })
+      : `\n\n${missingQuestion(decodeRow(open).extraction || { items: [] }) || ""}`.trimEnd();
+    return { ...answered, reply: answered.reply + reminder, extraction };
+  }
 
   let status;
   let reply;
-  if (structured.intent === "inquiry" && structured.items.length && structured.items.every((i) => i.quantity == null)) {
+  const advisory = ml.understood && KB_INTENTS.has(ml.intent) && !["price", "availability", "order"].includes(ml.intent);
+  if (hasProduct && !hasQuantity && !advisory && (["price", "availability"].includes(ml.intent) || structured.intent === "inquiry")) {
     status = "answered";
     reply = bestPriceReply(structured, farmer);
-  } else if (structured.intent !== "purchase_request" && structured.items.length === 0) {
-    status = merging ? open.status : "answered";
-    reply = extraction.reply_message;
+  } else if (!hasQuantity && ml.understood && KB_INTENTS.has(ml.intent) && !(hasProduct && ml.intent === "order")) {
+    return { ...answerFromKnowledge({ farmer, channel, sender, text, ml, language }), extraction };
+  } else if (!hasProduct && structured.intent !== "purchase_request" && ml.intent !== "order") {
+    if (merging) {
+      // Mid-order and we can't tell what this is: repeat the open question.
+      status = open.status;
+      reply = missingQuestion(structured) || confirmationPrompt(structured, farmer);
+    } else {
+      return { ...answerFromKnowledge({ farmer, channel, sender, text, ml: { ...ml, understood: false }, language }), extraction };
+    }
   } else {
     const question = missingQuestion(structured);
     status = question ? "needs_info" : "awaiting_confirmation";
@@ -544,6 +611,19 @@ async function handleInbound({ channel, sender, text }) {
     outcome = farmer
       ? { reply: `Naka-register na po kayo, ${farmer.name}. I-text ang kailangan ninyo, hal. "5 sako urea".` }
       : await handleOneLineRegistration({ channel, sender: from, text: message });
+  } else if (!farmer && isGuestQuestion(message)) {
+    // A question from someone not registered yet: answer it, then invite them.
+    const ml = classifyIntent(message);
+    const language = detectLanguage(message.toLowerCase().split(/[^a-zñ]+/));
+    const answered = answerFromKnowledge({ farmer: null, channel, sender: from, text: message, ml, language });
+    outcome = {
+      ...answered,
+      reply: `${answered.reply}\n\n${pick(language, {
+        tagalog: "Para makapag-order, mag-register muna: i-text ang REG Pangalan, Barangay, Bayan (hal. REG Juan Dela Cruz, Katipunan, M'lang).",
+        bisaya: "Aron maka-order, pag-register una: i-text ang REG Ngalan, Barangay, Lungsod (pananglitan REG Juan Dela Cruz, Katipunan, M'lang).",
+        english: "To order, register first: text REG Name, Barangay, Town (e.g. REG Juan Dela Cruz, Katipunan, M'lang).",
+      })}`,
+    };
   } else if (!farmer) {
     // BPMN: not registered → start the registration conversation, keeping the first text.
     saveSession(channel, from, { step: "name", data: {}, pending_message: message });

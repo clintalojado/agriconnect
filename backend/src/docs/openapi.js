@@ -98,6 +98,14 @@ const routes = [
     body: { raw_message: "Pabili po 10 sako urea, Katipunan, bago mag May", barangay: "Katipunan" },
   }],
   ["get", "/nlp/status", "NLP", "Which NLP engine is active"],
+  ["post", "/nlp/intent", "NLP", "ML intent classifier: what is this message about?", {
+    description:
+      "Machine-learning model (logistic regression on word + character n-grams) trained on ~480 farmer messages " +
+      "in Tagalog, Bisaya, and English. Returns the intent, its confidence, and the top 3 guesses. " +
+      'Try: "may delivery ba kayo sa dalipe?", "anong abono maganda sa palay", "pwede gcash?", "kulang ang dumating".',
+    body: { message: "may delivery ba kayo sa dalipe?" },
+  }],
+  ["get", "/nlp/intent/model", "NLP", "ML model details (algorithm, intents, training size)"],
 
   ["post", "/requests/create", "Requests", "Create a structured request", {
     status: 201,
