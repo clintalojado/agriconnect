@@ -79,6 +79,26 @@ router.post("/inbound", checkWebhookSecret, async (req, res, next) => {
   }
 });
 
+// Some SMS servers forward texts as GET ?from=...&message=... (and some check
+// the URL with a plain GET first). Without a message, describe the endpoint.
+router.get("/inbound", checkWebhookSecret, async (req, res, next) => {
+  const from = req.query.from || req.query.sender || req.query.number || req.query.phone;
+  const message = req.query.message || req.query.text || req.query.msg;
+  if (!from || !message) {
+    return res.json({
+      ok: true,
+      endpoint: "AgriConnect SMS inbound webhook",
+      usage: "POST JSON { from, message } (or GET ?from=09171234567&message=...). Replies go out through the configured SMS provider.",
+      provider: getProvider().name,
+    });
+  }
+  try {
+    res.json(await handleInbound({ channel: "sms", sender: from, text: message }));
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Log of SMS and Messenger texts. ?limit=&phone=&channel=sms|messenger
 router.get("/log", (req, res, next) => {
   try {

@@ -98,6 +98,9 @@ const routes = [
   ["post", "/inbound/{id}/publish", "SMS & Messenger intake", "Staff publishes the request for the farmer", { body: {} }],
   ["post", "/inbound/{id}/dismiss", "SMS & Messenger intake", "Dismiss an inbox item"],
   ["post", "/sms/inbound", "SMS & Messenger intake", "SMS gateway webhook", { body: { from: "09181234567", message: "STATUS" } }],
+  ["get", "/sms/inbound", "SMS & Messenger intake", "SMS gateway webhook (GET form, for servers that forward by URL)", {
+    query: [["from", "09181234567"], ["message", "HELP"]],
+  }],
   ["get", "/sms/log", "SMS & Messenger intake", "Outgoing/incoming text log", { query: [["limit", "20"], ["phone", ""], ["channel", ""]] }],
   ["get", "/sms/status", "SMS & Messenger intake", "Active SMS / Messenger providers"],
 
