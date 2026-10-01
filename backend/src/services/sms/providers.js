@@ -5,6 +5,10 @@
 //               Needs SEMAPHORE_API_KEY; SEMAPHORE_SENDER_NAME optional.
 //   twilio    — Twilio Programmable Messaging.
 //               Needs TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER.
+//   android   — free: the "SMS Gateway for Android" app (sms-gate.app) on a
+//               phone with a SIM, in Cloud mode. Texts go out from that SIM.
+//               Needs SMSGATE_USERNAME, SMSGATE_PASSWORD (shown in the app);
+//               SMSGATE_URL optional (defaults to the public cloud server).
 //
 // Each driver's send() resolves on success and throws on failure.
 
@@ -54,7 +58,32 @@ const twilioProvider = {
   },
 };
 
-const PROVIDERS = { console: consoleProvider, semaphore: semaphoreProvider, twilio: twilioProvider };
+const androidProvider = {
+  name: "android",
+  async send(to, body) {
+    const user = process.env.SMSGATE_USERNAME;
+    const password = process.env.SMSGATE_PASSWORD;
+    if (!user || !password) throw new Error("SMSGATE_USERNAME and SMSGATE_PASSWORD must be set");
+
+    const res = await fetch(`${smsGateUrl()}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${user}:${password}`).toString("base64")}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ textMessage: { text: body }, phoneNumbers: [toE164(to)] }),
+    });
+    if (!res.ok) {
+      throw new Error(`SMS Gateway responded ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    }
+  },
+};
+
+function smsGateUrl() {
+  return (process.env.SMSGATE_URL || "https://api.sms-gate.app/3rdparty/v1").replace(/\/+$/, "");
+}
+
+const PROVIDERS = { console: consoleProvider, semaphore: semaphoreProvider, twilio: twilioProvider, android: androidProvider };
 
 function getProvider() {
   const name = (process.env.SMS_PROVIDER || "console").toLowerCase();
@@ -70,4 +99,4 @@ function toE164(phone) {
   return normalized ? `+${normalized}` : phone;
 }
 
-module.exports = { getProvider };
+module.exports = { getProvider, smsGateUrl };

@@ -2,8 +2,8 @@
 
 **Farm Inputs, Closer to You.** A platform that connects small-scale Filipino
 farmers with verified agri-input suppliers. Farmers order fertilizer, seeds,
-pesticides, and feeds by SMS, Facebook Messenger, or the app, in Tagalog,
-Bisaya, or English. They compare quotations and track delivery to their barangay.
+pesticides, and feeds by SMS, Facebook Messenger, or the app, in their own
+language. They compare quotations and track delivery to their barangay.
 
 ## Live demo
 
@@ -68,8 +68,9 @@ confirm with `OO`, check `STATUS`, and receive quote and delivery updates.
 - **Backend**: Node.js + Express (`backend/`), with Server-Sent Events for live updates
 - **Database**: SQLite via `node:sqlite` (`backend/src/data/`), written to port to PostgreSQL later
 - **AI/NLP**: Claude API (`claude-opus-5`, structured outputs, server-side refusal
-  fallback), with an offline Tagalog/Bisaya/English rule-based parser as a fallback
-- **Channels**: SMS (Semaphore / Twilio / console), Facebook Messenger (Send API
+  fallback), with an offline rule-based parser as a fallback, plus two offline
+  ML models: a language identifier and an intent classifier (see below)
+- **Channels**: SMS (Android phone gateway / Semaphore / Twilio / console), Facebook Messenger (Send API
   + webhook), in-app chat, WebRTC voice calls
 
 ## Running the prototype (dev)
@@ -96,6 +97,38 @@ codes are shown on screen and outgoing texts are printed in the backend log.
 
 Without an `ANTHROPIC_API_KEY` everything still works: message reading falls
 back to the offline parser, which is less accurate on unusual phrasing.
+
+### Languages
+
+The SMS / Messenger bot runs fully offline, with no paid API:
+
+- **Understands** Tagalog, Bisaya (Cebuano), Hiligaynon (Ilonggo), Ilocano,
+  Bikol, Waray, Kapampangan, Pangasinan, Maguindanaon, English, and mixes like
+  Taglish. That covers number words ("lima ka sako", "tallo a sako", "atlung
+  sakung"), yes/no (oo, huo, wen, iyo…), products, and dates (buwas, inton bigat, Sabado).
+- **Replies** in the farmer's language for Tagalog, Bisaya, Hiligaynon,
+  Ilocano, and English. Other languages get Tagalog replies.
+- Short texts like `OO`, a name, or `5 sako urea` keep the language the farmer
+  last used. Alerts (quotes, verification, delivery) are sent in it too.
+
+`npm run nlp:eval` (in `backend/`) scores both ML models on held-out messages
+and with 5-fold cross-validation. Training data: `backend/src/services/nlp/language/corpus.js`
+(language) and `backend/src/services/nlp/intent/dataset*.js` (intents).
+
+### Real SMS for free (Android phone as the gateway)
+
+1. On a spare Android phone with a SIM (load or an unlimited-text promo), install
+   **SMS Gateway for Android** ([sms-gate.app](https://sms-gate.app)), turn on
+   **Cloud server**, and note the username and password it shows.
+2. In Render → Environment set `SMS_PROVIDER=android`, `SMSGATE_USERNAME` and
+   `SMSGATE_PASSWORD` (optionally `SMSGATE_SIGNING_KEY` from the app's webhook
+   settings).
+3. Once, from `backend/` with the same two values in `.env`:
+   `npm run sms:webhook -- https://agriconnect-61co.onrender.com`
+
+Farmers then text the phone's number; the app forwards the text to
+`/api/sms/inbound` and AgriConnect's reply goes out from that SIM. Keep the
+phone on, charged, and online.
 
 ## Status and limits
 

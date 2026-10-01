@@ -10,6 +10,17 @@ const { money, perUnit } = require("../utils/format");
 
 const OPEN_REQUEST_STATUSES = ["validated", "aggregated"];
 
+// The "you got a quote" text, in each reply language (notify picks the farmer's).
+function quoteText(what, price, from) {
+  return {
+    tl: `[AgriConnect] May quote para sa ${what}: ${price} mula sa ${from}. Buksan ang AgriConnect para tanggapin.`,
+    bis: `[AgriConnect] Naay quote para sa ${what}: ${price} gikan sa ${from}. Ablihi ang AgriConnect aron dawaton.`,
+    hil: `[AgriConnect] May quote para sa ${what}: ${price} halin sa ${from}. Buksi ang AgriConnect para batunon.`,
+    ilo: `[AgriConnect] Adda quote para iti ${what}: ${price} manipud iti ${from}. Lukatan ti AgriConnect tapno awaten.`,
+    en: `[AgriConnect] New quote for ${what}: ${price} from ${from}. Open AgriConnect to accept.`,
+  };
+}
+
 function getQuote(id) {
   const quote = getDb()
     .prepare(
@@ -69,7 +80,7 @@ async function sendQuote({ request_id, supplier_id, price_per_unit, quantity, de
     title: `${existing ? "Updated quotation" : "New quotation"} for ${request.product_name}`,
     body: `${supplier.name}: ${money(price)}/${perUnit(request.unit)}${delivery_option === "pickup" ? " · pickup" : ""}`,
     link: `#/requests/${request.id}`,
-    text: `[AgriConnect] May quote para sa ${request.quantity} ${request.unit || ""} ${request.product_name}: ${money(price)}/${perUnit(request.unit)} mula sa ${supplier.name}. Buksan ang AgriConnect para tanggapin.`,
+    text: quoteText(`${request.quantity} ${request.unit || ""} ${request.product_name}`, `${money(price)}/${perUnit(request.unit)}`, supplier.name),
   });
   return quote;
 }

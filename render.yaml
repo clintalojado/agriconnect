@@ -25,9 +25,17 @@ services:
         sync: false
       - key: MESSENGER_APP_SECRET
         sync: false
-      # Texts are logged (GET /api/sms/log) instead of really sent.
+      # Set in the dashboard. Empty/console = texts are only logged (GET /api/sms/log).
+      # android = really send for free through the SMS Gateway for Android app
+      # on a phone with a SIM (also set the SMSGATE_* secrets).
       - key: SMS_PROVIDER
-        value: console
+        sync: false
+      - key: SMSGATE_USERNAME
+        sync: false
+      - key: SMSGATE_PASSWORD
+        sync: false
+      - key: SMSGATE_SIGNING_KEY
+        sync: false
       - key: FARMER_VERIFICATION
         value: auto
       - key: SEED_DEMO

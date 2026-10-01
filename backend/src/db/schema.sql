@@ -291,6 +291,16 @@ CREATE TABLE IF NOT EXISTS registration_sessions (
     UNIQUE (channel, sender)
 );
 
+-- The language each texter last wrote in, so replies to short messages
+-- ("OO", "5 sako", a name) stay in that language.
+CREATE TABLE IF NOT EXISTS chat_languages (
+    channel     TEXT NOT NULL,
+    sender      TEXT NOT NULL,
+    language    TEXT NOT NULL,
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (channel, sender)
+);
+
 -- 18c. One-time codes proving a farmer owns a phone number
 CREATE TABLE IF NOT EXISTS otp_codes (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,

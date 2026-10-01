@@ -107,12 +107,22 @@ const routes = [
   ["get", "/nlp/status", "NLP", "Which NLP engine is active"],
   ["post", "/nlp/intent", "NLP", "ML intent classifier: what is this message about?", {
     description:
-      "Machine-learning model (logistic regression on word + character n-grams) trained on ~480 farmer messages " +
-      "in Tagalog, Bisaya, and English. Returns the intent, its confidence, and the top 3 guesses. " +
-      'Try: "may delivery ba kayo sa dalipe?", "anong abono maganda sa palay", "pwede gcash?", "kulang ang dumating".',
+      "Machine-learning model (logistic regression on word + character n-grams) trained on ~700 farmer messages " +
+      "in Tagalog, Bisaya, Hiligaynon, Ilocano, English, and other Philippine languages. Returns the intent, its confidence, and the top 3 guesses. " +
+      'Try: "may delivery ba kayo sa dalipe?", "tagpila ang urea subong", "adda kadi abonoyo", "kulang ang dumating".',
     body: { message: "may delivery ba kayo sa dalipe?" },
   }],
   ["get", "/nlp/intent/model", "NLP", "ML model details (algorithm, intents, training size)"],
+  ["post", "/nlp/language", "NLP", "ML language identifier: which Philippine language is this?", {
+    description:
+      "Naive Bayes model on character n-grams, trained on farmer messages in Tagalog, Bisaya (Cebuano), Hiligaynon, " +
+      "Ilocano, Bikol, Waray, Kapampangan, Pangasinan, Maguindanaon, and English. `confident` is false for texts with no " +
+      "language-specific words (\"OO\", \"5 sako urea\"); the bot then keeps the sender's last language. `reply_language` " +
+      "is the language the bot answers in. " +
+      'Try: "mabakal ako sang lima ka sako nga urea", "gumatangak ti tallo a sako", "dios mabalos po", "saliwan ku ing urea".',
+    body: { message: "mabakal ako sang lima ka sako nga urea buwas" },
+  }],
+  ["get", "/nlp/language/model", "NLP", "Language model details (languages, training size, reply languages)"],
 
   ["post", "/requests/create", "Requests", "Create a structured request", {
     status: 201,

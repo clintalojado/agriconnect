@@ -1,7 +1,19 @@
 // Shared vocabulary for the NLP layer: canonical product/unit names and the
-// Tagalog/Bisaya/English words farmers use for them. Used by the rule-based
+// words farmers use for them in Tagalog, Bisaya, Hiligaynon, Ilocano, Bikol,
+// Waray, Kapampangan, Pangasinan, Maguindanaon, and English. Used by the rule-based
 // parser directly, and to normalize the AI extraction so both paths store the
 // same product names (which is what demand aggregation groups on).
+
+// Word lists shared by several product patterns.
+const SEED = "seeds?|binhi|liso|similya|bukel|bini";
+const RICE = "rice|palay|humay|pagay|pale|paroy|pagey";
+const WEEDS = "damo|sagbot|hilamon|ruot|dikut|duot";
+const PESTS = "insekto|peste|ulod|uod|igges";
+const KILLER = "pamatay|pangpatay|pangpapatay|panggadan|hilo|agas|bulong|tambal|gamot";
+// "of"/"for" linkers: ng, sa, sang, ti, iti, nin, han, ha, king, ning, ed, na
+const OF = String.raw`(?:(?:ng|sa|sang|ti|iti|nin|han|ha|king|ning|ed|na)\s+)?`;
+const words = (list) => `(?:${list})`;
+const re = (source) => new RegExp(source);
 
 // Order matters: more specific products must come before generic ones
 // ("organic fertilizer" before "fertilizer").
@@ -12,38 +24,51 @@ const PRODUCTS = [
   { name: "Ammophos (16-20-0)", patterns: [/\b16-20-0\b/, /\bammophos\b/, /\bamophos\b/] },
   { name: "Muriate of potash (0-0-60)", patterns: [/\b0-0-60\b/, /\bpotash\b/, /\bmuriate\b/] },
   { name: "Organic fertilizer", patterns: [/\borganic\b/, /\borganiko\b/, /\bvermicast\b/, /\bcompost\b/] },
-  { name: "Hybrid corn seeds", patterns: [/\b(hybrid\s+)?(corn|mais)\s*(seeds?|binhi|liso|similya)\b/, /\b(binhi|liso|similya)\s*(ng\s+|sa\s+)?(corn|mais)\b/] },
-  { name: "Rice seeds", patterns: [/\b(rice|palay|humay)\s*(seeds?|binhi|liso|similya)\b/, /\b(binhi|liso|similya)\s*(ng\s+|sa\s+)?(rice|palay|humay)\b/, /\bcertified\s+seeds?\b/] },
-  { name: "Herbicide", patterns: [/\bherbicides?\b/, /\bpamatay\s*(ng\s+)?damo\b/, /\bhilo\s*(sa\s+)?sagbot\b/] },
-  { name: "Insecticide", patterns: [/\binsecticides?\b/, /\bpesticides?\b/, /\bpamatay\s*(ng\s+)?(insekto|peste)\b/, /\bhilo\s*(sa\s+)?(insekto|peste)\b/] },
+  {
+    name: "Hybrid corn seeds",
+    patterns: [
+      re(String.raw`\b(hybrid\s+)?(corn|mais)\s*${words(SEED)}\b`),
+      re(String.raw`\b${words(SEED)}\s*${OF}(corn|mais)\b`),
+    ],
+  },
+  {
+    name: "Rice seeds",
+    patterns: [
+      re(String.raw`\b${words(RICE)}\s*${words(SEED)}\b`),
+      re(String.raw`\b${words(SEED)}\s*${OF}${words(RICE)}\b`),
+      /\bcertified\s+seeds?\b/,
+    ],
+  },
+  { name: "Herbicide", patterns: [/\bherbicides?\b/, re(String.raw`\b${words(KILLER)}\s*${OF}${words(WEEDS)}\b`)] },
+  { name: "Insecticide", patterns: [/\binsecticides?\b/, /\bpesticides?\b/, re(String.raw`\b${words(KILLER)}\s*${OF}${words(PESTS)}\b`)] },
   { name: "Fungicide", patterns: [/\bfungicides?\b/] },
   {
     name: "Hog grower feed",
     patterns: [
       /\b(hog|pig|swine)\s*(grower\s*)?feeds?\b/,
-      /\bfeeds?\s*(para\s+)?(sa\s+)?(baboy|hog|pig|swine)s?\b/,
-      /\bpakain\s*(sa\s+|ng\s+)?baboy\b/,
+      /\bfeeds?\s*(para\s*)?(sa\s+|iti\s+|king\s+|han\s+|d\s+)?(baboy|babi|hog|pig|swine)s?\b/,
+      /\b(pakain|pagkaon|pakaon|taraon)\s*(sa\s+|ng\s+|ti\s+|sang\s+)?(baboy|babi)\b/,
     ],
   },
   {
     name: "Chicken feed",
     patterns: [
       /\b(chicken|poultry|layer|broiler)\s*feeds?\b/,
-      /\bfeeds?\s*(para\s+)?(sa\s+)?(manok|chicken|poultry)\b/,
-      /\bpakain\s*(sa\s+|ng\s+)?manok\b/,
+      /\bfeeds?\s*(para\s*)?(sa\s+|iti\s+|king\s+|han\s+|d\s+)?(manok|manuk|chicken|poultry)\b/,
+      /\b(pakain|pagkaon|pakaon|taraon)\s*(sa\s+|ng\s+|ti\s+|sang\s+)?(manok|manuk)\b/,
       /\bpatuka\b/,
     ],
   },
   // Plain "abono"/"fertilizer" usually means complete fertilizer; it's marked
   // generic so its confidence stays low and the farmer is asked to check it.
-  { name: "Complete fertilizer (14-14-14)", generic: true, patterns: [/\bfertili[sz]er\b/, /\babono\b/, /\bpataba\b/] },
+  { name: "Complete fertilizer (14-14-14)", generic: true, patterns: [/\bfertili[sz]er\b/, /\babon[ou]\b/, /\bpataba\b/] },
 ];
 
 const UNITS = [
-  { name: "sacks", patterns: [/^sa+ko(ng|s)?$/, /^sacks?$/, /^bags?$/, /^baks?$/, /^kaban$/] },
+  { name: "sacks", patterns: [/^sa+k[ou](ng|s)?$/, /^sacks?$/, /^bags?$/, /^baks?$/, /^kaban$/] },
   { name: "kg", patterns: [/^kilos?$/, /^kgs?$/, /^kls?$/, /^kilograms?$/, /^kilo(ng|gramo)$/] },
   { name: "liters", patterns: [/^lit(ro|er|re)s?(ng)?$/, /^ltrs?$/, /^l$/] },
-  { name: "bottles", patterns: [/^bot(e|ol|tles?)(ng)?$/] },
+  { name: "bottles", patterns: [/^bot(e|ol|tles?|elya)(ng)?$/] },
   { name: "packs", patterns: [/^pa(ck|ke)(s|ts?|te|teng)?$/, /^sachets?$/] },
 ];
 
@@ -56,11 +81,29 @@ const NUMBER_WORDS = {
   // Bisaya/Cebuano
   usa: 1, duha: 2, tulo: 3, upat: 4, unom: 6, napulo: 10, kinse: 15, baynte: 20, trenta: 30, traynta: 30,
   kwarenta: 40, singkwenta: 50, gatos: 100,
+  // Hiligaynon / Waray (other forms are shared with Tagalog or Bisaya above)
+  anom: 6,
+  // Ilocano ("lima a sako")
+  maysa: 1, dua: 2, tallo: 3, uppat: 4, innem: 6, siam: 9, sangapulo: 10, duapulo: 20,
+  // Bikol, with linker forms ("tolong sako")
+  saro: 1, sarong: 1, duwa: 2, duwang: 2, tolo: 3, tolong: 3, sampulo: 10, sampulong: 10,
+  // Kapampangan, with linker forms ("atlung sakung urea")
+  metung: 1, adwa: 2, adwang: 2, atlu: 3, atlung: 3, anam: 6, pitu: 7, walu: 8, apulu: 10, apulung: 10,
+  // Pangasinan counting forms ("taloran sako")
+  sakey: 1, duara: 2, duaran: 2, talora: 3, taloran: 3, apatira: 4, apatiran: 4, limara: 5, limaran: 5, samplo: 10, samplora: 10,
+  // Maguindanaon
+  telu: 3, sapulu: 10,
   // Spanish-derived numbers common in both
   uno: 1, dos: 2, tres: 3, kwatro: 4, singko: 5, sais: 6, siyete: 7, otso: 8, nuwebe: 9, diyes: 10, dose: 12,
   // English
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
   twenty: 20, thirty: 30, fifty: 50, hundred: 100,
+};
+
+// Day names → Date#getDay() index. "Linggo" is left out: it also means "week".
+const WEEKDAYS = {
+  lunes: 1, monday: 1, martes: 2, tuesday: 2, miyerkules: 3, miyerkoles: 3, myerkules: 3, wednesday: 3,
+  huwebes: 4, thursday: 4, biyernes: 5, byernes: 5, friday: 5, sabado: 6, saturday: 6, domingo: 0, dominggo: 0, sunday: 0,
 };
 
 const MONTHS = {
@@ -76,14 +119,6 @@ const MONTHS = {
   october: 9, oct: 9, oktubre: 9,
   november: 10, nov: 10, nobyembre: 10,
   december: 11, dec: 11, disyembre: 11,
-};
-
-// Marker words used to guess the message language. Deliberately small and
-// high-signal — shared words ("gusto", "lima") are left out.
-const LANGUAGE_MARKERS = {
-  tagalog: ["po", "ng", "mga", "namin", "kailangan", "bago", "ang", "pwede", "puwede", "magkano", "ilang", "susunod", "linggo", "buwan", "bukas", "ninyo", "meron", "opo", "yung", "bili", "bibili", "para", "pa", "manok", "baboy", "lang", "naman", "ba", "sana", "ho", "nyo", "hanggang"],
-  bisaya: ["nako", "namo", "akong", "amo", "palihug", "pila", "unsa", "ugma", "sunod", "kinahanglan", "naa", "humay", "liso", "semana", "bulan", "karon", "dayon", "og", "ug", "palit", "paliton", "nga", "hatod", "karong", "asa", "gyud", "diri", "sab", "ta"],
-  english: ["need", "please", "before", "the", "for", "want", "next", "week", "month", "how", "much", "we", "our", "i", "is", "price", "available"],
 };
 
 function canonicalProduct(text) {
@@ -104,4 +139,4 @@ function canonicalUnit(text) {
   return null;
 }
 
-module.exports = { PRODUCTS, UNITS, NUMBER_WORDS, MONTHS, LANGUAGE_MARKERS, canonicalProduct, canonicalUnit };
+module.exports = { PRODUCTS, UNITS, NUMBER_WORDS, MONTHS, WEEKDAYS, canonicalProduct, canonicalUnit };

@@ -1,4 +1,5 @@
-// Evaluates the intent classifier two ways:
+// Evaluates the language identifier (held-out set + 5-fold cross-validation),
+// then the intent classifier two ways:
 //   1. Held-out test set (test-set.js): messages never seen in training.
 //   2. 5-fold stratified cross-validation over the training data.
 // Prints accuracy, macro-F1, per-intent precision/recall/F1 and the misses.
@@ -7,6 +8,10 @@
 const { train, predict } = require("../src/services/nlp/intent/classifier");
 const { EXAMPLES } = require("../src/services/nlp/intent/dataset");
 const { TEST_SET } = require("../src/services/nlp/intent/test-set");
+const { train: trainLanguage, predict: predictLanguage } = require("../src/services/nlp/language/identifier");
+const { CORPUS } = require("../src/services/nlp/language/corpus");
+const { TEST_SET: LANGUAGE_TEST_SET } = require("../src/services/nlp/language/test-set");
+const { identifyLanguage } = require("../src/services/nlp/language");
 
 function score(pairs) {
   const labels = [...new Set(pairs.flatMap((p) => [p.expected, p.predicted]))].sort();
@@ -48,14 +53,51 @@ function crossValidate(folds = 5) {
   return score(pairs);
 }
 
+// ---------- Language identifier ----------
+
+function languageEval() {
+  const holdoutPairs = LANGUAGE_TEST_SET.map((t) => {
+    const r = identifyLanguage(t.text);
+    return { text: t.text, expected: t.language, predicted: r.language, confidence: r.confidence };
+  });
+  // 5-fold cross-validation over the training corpus.
+  const cvPairs = [];
+  for (let k = 0; k < 5; k++) {
+    const trainSet = {};
+    const testSet = [];
+    for (const [language, sentences] of Object.entries(CORPUS)) {
+      trainSet[language] = sentences.filter((_, i) => i % 5 !== k);
+      sentences.forEach((s, i) => i % 5 === k && testSet.push({ text: s, language }));
+    }
+    const model = trainLanguage(trainSet);
+    for (const t of testSet) cvPairs.push({ expected: t.language, predicted: predictLanguage(model, t.text).ranking[0].language });
+  }
+  return {
+    holdout: { ...score(holdoutPairs), misses: holdoutPairs.filter((p) => p.expected !== p.predicted), n: holdoutPairs.length },
+    cv: score(cvPairs),
+  };
+}
+
 const pct = (n) => `${(n * 100).toFixed(1)}%`;
 const holdout = holdOut();
 const cv = crossValidate();
+const lang = languageEval();
 
 if (process.argv.includes("--json")) {
-  console.log(JSON.stringify({ holdout, cross_validation: cv }, null, 2));
+  console.log(JSON.stringify({ holdout, cross_validation: cv, language: lang }, null, 2));
   process.exit(0);
 }
+
+console.log("=== LANGUAGE IDENTIFIER ===");
+console.log(`Training sentences: ${Object.values(CORPUS).flat().length}   Held-out test messages: ${lang.holdout.n}\n`);
+console.log(`HELD-OUT TEST SET   accuracy ${pct(lang.holdout.accuracy)}   macro-F1 ${pct(lang.holdout.macroF1)}`);
+console.log(`5-FOLD CROSS-VAL    accuracy ${pct(lang.cv.accuracy)}   macro-F1 ${pct(lang.cv.macroF1)}\n`);
+console.log("Per language (5-fold cross-validation):");
+for (const r of lang.cv.perIntent) {
+  console.log(`  ${r.label.padEnd(14)} ${String(r.support).padStart(3)}   precision ${pct(r.precision).padStart(7)}  recall ${pct(r.recall).padStart(7)}`);
+}
+for (const m of lang.holdout.misses) console.log(`  miss: "${m.text}"  expected ${m.expected}, got ${m.predicted} (${pct(m.confidence)})`);
+console.log("\n=== INTENT CLASSIFIER ===");
 
 console.log(`Training examples: ${EXAMPLES.length}   Held-out test messages: ${holdout.n}\n`);
 console.log(`HELD-OUT TEST SET   accuracy ${pct(holdout.accuracy)}   macro-F1 ${pct(holdout.macroF1)}`);

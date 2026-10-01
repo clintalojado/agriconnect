@@ -4,29 +4,27 @@
 // scores are deliberately conservative so the review screen flags more fields
 // for the farmer to double-check.
 
-const { PRODUCTS, NUMBER_WORDS, MONTHS, LANGUAGE_MARKERS, canonicalUnit } = require("./lexicon");
+const { PRODUCTS, NUMBER_WORDS, MONTHS, WEEKDAYS, canonicalUnit } = require("./lexicon");
+const { identifyLanguage } = require("./language");
 const { findBarangayInText, isMlangBarangay, canonicalBarangay } = require("../locations");
 
+// "How much / is there" and "buy / need" in the languages the bot reads.
 const INQUIRY_WORDS =
-  /\b(magkano|pila|presyo|price|how much|available ba|naa ba|naa bay|meron ba|meron bang|may stock|stock ba|tag pila|do you have|is there)\b|\?\s*$/;
+  /\b(magkano|magkanu|pila|pilan|tagpila|tag pila|tagpira|pira|pigara|mano|presyo|presyu|price|how much|available ba|naa ba|naa bay|meron ba|meron bang|may stock|stock ba|may ara|ara bala|adda kadi|adda pay|igwa|mayda|atin ba|aden|do you have|is there)\b|\?\s*$/;
 const PURCHASE_WORDS =
-  /\b(order|request|bili|bibili|palit|paliton|mopalit|kailangan|kinahanglan|need|gusto|want|pwede|puwede|pa-order|reserve)\b/;
+  /\b(order|request|bili|bibili|palit|paliton|mopalit|mapalit|bakal|mabakal|bakalon|gatang|gumatang|gumatangak|gatangen|saliwan|saliwen|pamasa|kailangan|kinahanglan|kasapulak|kasapulan|kaipuhan|nakaukolan|need|gusto|buri|labay|kayatko|karuyag|want|pwede|puwede|pa-order|reserve)\b/;
 const BARANGAY_STOPWORDS = new Set([
-  "namo", "namin", "amo", "ko", "po", "nato", "natin", "kami", "ninyo", "nyo", "sa", "ng", "para", "kailangan",
-  "kinahanglan", "before", "bago", "next", "sunod", "please", "palihug", "salamat", "thanks", "na", "nga", "ug", "og",
-  "mga", "pwede", "puwede", "delivery", "hatod", "deliver", "asap", "karon", "ngayon", "this", "by", "at", "and",
+  "namo", "namin", "amo", "amon", "ko", "po", "pu", "nato", "natin", "kami", "ninyo", "nyo", "sa", "ng", "para", "kailangan",
+  "kinahanglan", "before", "bago", "next", "sunod", "masunod", "please", "palihug", "palihog", "salamat", "thanks", "na", "nga",
+  "ug", "og", "kag", "ken", "mga", "pwede", "puwede", "delivery", "hatod", "deliver", "asap", "karon", "subong", "ita", "ngayon",
+  "this", "by", "at", "and", "iti", "ti", "ditoy", "diri", "buwas", "ugma", "bukas", "inton",
 ]);
 
-function detectLanguage(tokens) {
-  const scores = {};
-  for (const [lang, markers] of Object.entries(LANGUAGE_MARKERS)) {
-    scores[lang] = tokens.filter((t) => markers.includes(t)).length;
-  }
-  const ranked = Object.entries(scores).sort((a, b) => b[1] - a[1]);
-  const [top, second] = ranked;
-  if (top[1] === 0) return "other";
-  if (second[1] > 0 && second[1] >= top[1] * 0.6) return "mixed";
-  return top[0];
+// The rule path labels its own extraction; it only commits to a language when
+// the message has words specific to one (else "other").
+function detectLanguage(text) {
+  const result = identifyLanguage(text);
+  return result.confident ? result.language : "other";
 }
 
 // Every product mentioned, in the order it appears. The generic "fertilizer"
@@ -49,12 +47,17 @@ function findProductHits(lower) {
 }
 
 const UNIT_WORDS =
-  "sa+ko(?:ng|s)?|sacks?|bags?|kaban|kilo(?:s|ng|grams?)?|kgs?|kls?|lit(?:ro|er|re)s?|litrong|ltrs?|bote(?:ng)?|bottles?|packs?|pakete(?:ng)?|sachets?";
+  "sa+k[ou](?:ng|s)?|sacks?|bags?|kaban|kilo(?:s|ng|grams?)?|kgs?|kls?|lit(?:ro|er|re)s?|litrong|ltrs?|bote(?:ng)?|botelya|bottles?|packs?|pakete(?:ng)?|sachets?";
 
-// "<number> [ka/na/ng] <unit>" anywhere in the text, e.g. "5 sako", "lima ka sako", "50kg".
+// Words between a number and its unit: "lima ka sako", "lima a sako" (Ilocano),
+// "lima nin sako" (Bikol), "lima hin sako" (Waray), "5 x sako".
+const QUANTITY_LINKERS = ["ka", "na", "ng", "nga", "a", "nin", "hin", "ya"];
+
+// "<number> [linker] <unit>" anywhere in the text, e.g. "5 sako", "lima ka sako", "50kg".
 function findQuantityHits(lower) {
   const numbers = `\\d+(?:\\.\\d+)?|${Object.keys(NUMBER_WORDS).sort((a, b) => b.length - a.length).join("|")}`;
-  const re = new RegExp(`\\b(${numbers})\\s*(?:ka\\s+|na\\s+|ng\\s+|x\\s*)?(${UNIT_WORDS})\\b`, "g");
+  const linker = `(?:(?:${QUANTITY_LINKERS.join("|")})\\s+|x\\s*)?`;
+  const re = new RegExp(`\\b(${numbers})\\s*${linker}(${UNIT_WORDS})\\b`, "g");
   return [...lower.matchAll(re)].map((m) => ({
     index: m.index,
     quantity: parseNumberToken(m[1]),
@@ -95,7 +98,7 @@ function findQuantity(tokens) {
       if (!candidate) break;
       const unit = canonicalUnit(candidate);
       if (unit) return { quantity: n, unit, unitExplicit: true };
-      if (!["ka", "na", "ng", "nga", "pcs", "x"].includes(candidate)) break;
+      if (![...QUANTITY_LINKERS, "pcs", "x"].includes(candidate)) break;
     }
   }
   // "kg"/"kls" glued to the number: "50kg"
@@ -183,16 +186,30 @@ function findDate(lower, today, original) {
   }
 
   const relative = [
-    { re: /\b(bukas|ugma|tomorrow)\b/, days: 1 },
-    { re: /\b(next week|susunod na linggo|sunod semana|sunod nga semana|sa sunod semana)\b/, days: 7 },
-    { re: /\b(asap|agad|dayon|karon dayon|ngayon din|urgent|madalian)\b/, days: 0 },
+    // bukas (Tagalog/Kapampangan), ugma (Bisaya), buwas (Hiligaynon/Waray), inton bigat (Ilocano), nabuas (Pangasinan)
+    { re: /\b(bukas|ugma|buwas|inton bigat|intono bigat|nabuas|tomorrow)\b/, days: 1 },
+    {
+      re: /\b(next week|susunod na linggo|sunod semana|sunod nga semana|sa sunod semana|masunod nga semana|sunod na semana|sumaruno a lawas|inton sumaruno a lawas|susunod a dominggu)\b/,
+      days: 7,
+    },
+    { re: /\b(asap|agad|dayon|karon dayon|subong dayon|ngayon din|urgent|madalian|ita met laeng)\b/, days: 0 },
   ];
   for (const { re, days } of relative) {
     const m = lower.match(re);
     if (m) return { phrase: phraseOf(m), iso: isoDate(addDays(today, days)) };
   }
 
-  const nextMonth = lower.match(/\b(next month|susunod na buwan|sunod buwan|sunod nga bulan|sunod bulan)\b/);
+  // "Sabado", "karong Sabado", "this Saturday": the next such day (today counts).
+  const dayNames = Object.keys(WEEKDAYS).join("|");
+  const weekday = lower.match(new RegExp(`\\b(?:(?:sa|karong|ngayong|this|on|inton|sa darating na)\\s+)?(${dayNames})\\b`));
+  if (weekday) {
+    const ahead = (WEEKDAYS[weekday[1]] - today.getDay() + 7) % 7;
+    return { phrase: phraseOf(weekday), iso: isoDate(addDays(today, ahead)) };
+  }
+
+  const nextMonth = lower.match(
+    /\b(next month|susunod na buwan|sunod buwan|sunod nga bulan|sunod bulan|masunod nga bulan|sunod na bulan|sumaruno a bulan)\b/
+  );
   if (nextMonth) {
     return { phrase: phraseOf(nextMonth), iso: isoDate(new Date(today.getFullYear(), today.getMonth() + 1, 1)) };
   }
@@ -219,7 +236,7 @@ function extractWithRules(rawMessage, { today = new Date() } = {}) {
   const quantityHit = items[0]?.quantity != null ? { ...items[0], unitExplicit: Boolean(items[0].unit) } : findQuantity(tokens);
   const barangay = findBarangay(rawMessage);
   const date = findDate(lower, today, rawMessage);
-  const language = detectLanguage(tokens);
+  const language = detectLanguage(rawMessage);
 
   const defaultsToSacks = (name) => /fertilizer|urea|sulfate|ammophos|potash|feed/i.test(name);
   let unit = quantityHit?.unit ?? null;
@@ -258,4 +275,4 @@ function extractWithRules(rawMessage, { today = new Date() } = {}) {
   };
 }
 
-module.exports = { extractWithRules, detectLanguage, isoDate };
+module.exports = { extractWithRules, isoDate };

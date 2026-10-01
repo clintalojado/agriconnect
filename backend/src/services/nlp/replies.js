@@ -2,6 +2,8 @@
 // rule-based parser (the AI path writes its own), and by the SMS channel for
 // fixed system messages.
 
+const { replyLanguage } = require("./i18n");
+
 function describeOrder({ product_name, quantity, unit }) {
   return [quantity, unit, product_name].filter((v) => v != null && v !== "").join(" ");
 }
@@ -35,6 +37,34 @@ const TEMPLATES = {
     inquiry: "Salamat sa pangutana. Susihon namo ang presyo ug stock ug pahibaw-on ka namo.",
     other: "Pasensya, wala namo masabti. Pananglitan: \"10 ka sako urea, sa dili pa Mayo\".",
   },
+  hiligaynon: {
+    confirm: (o) =>
+      `Salamat! Nabaton namon ang inyo request: ${describeOrder(o)}${
+        o.preferred_date ? ` (kinahanglan ${o.preferred_date})` : ""
+      }. Pahibaluon namon kamo kon may tanyag na halin sa supplier.`,
+    ask: {
+      product_name: "Ano nga produkto ang kinahanglan mo? (pareho sang urea, 14-14-14, binhi sang mais)",
+      quantity: "Pila ka sako ukon kilo ang kinahanglan mo?",
+      unit: "Sako, kilo, ukon litro bala?",
+      barangay: "Diin nga barangay kamo?",
+    },
+    inquiry: "Salamat sa pamangkot. Usisaon namon ang presyo kag stock kag pahibaluon namon kamo.",
+    other: "Pasensya, wala namon naintiendihan. Pareho sang: \"10 ka sako urea, antes sang Mayo\".",
+  },
+  ilocano: {
+    confirm: (o) =>
+      `Agyamanak! Naawatmi ti requestyo: ${describeOrder(o)}${
+        o.preferred_date ? ` (kasapulan ${o.preferred_date})` : ""
+      }. Ipakaammomi kadakayo no adda ti idiaya ti supplier.`,
+    ask: {
+      product_name: "Ania a produkto ti kasapulam? (kas iti urea, 14-14-14, bukel ti mais)",
+      quantity: "Mano a sako wenno kilo ti kasapulam?",
+      unit: "Sako, kilo, wenno litro kadi?",
+      barangay: "Ania a barangay ti ayanyo?",
+    },
+    inquiry: "Agyamanak iti saludsodyo. Kitaenmi ti presyo ken stock ket ipakaammomi kadakayo.",
+    other: "Pakawan, saanmi a naawatan. Kas iti: \"10 a sako nga urea, sakbay ti Mayo\".",
+  },
   english: {
     confirm: (o) =>
       `Thanks! We got your request: ${describeOrder(o)}${
@@ -51,10 +81,9 @@ const TEMPLATES = {
   },
 };
 
+// Other languages, mixed, and unknown get Tagalog (see i18n.js).
 function templatesFor(language) {
-  if (language === "bisaya") return TEMPLATES.bisaya;
-  if (language === "english") return TEMPLATES.english;
-  return TEMPLATES.tagalog; // default for tagalog, mixed, and unknown
+  return TEMPLATES[replyLanguage(language)] || TEMPLATES.tagalog;
 }
 
 function confirmationReply(language, order) {

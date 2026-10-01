@@ -20,6 +20,19 @@ const STATUS_TEXT = {
   cancelled: "was cancelled",
 };
 
+// The same updates as texted to farmers, in their language: [tl, bis, hil, ilo].
+const FARMER_STATUS_TEXT = {
+  for_delivery: ["papunta na", "padulong na", "padulong na", "addan iti dalan"],
+  delivered: [
+    "na-deliver na — paki-confirm kung natanggap ninyo",
+    "nahatod na — palihug i-confirm kung nadawat nimo",
+    "nahatod na — palihog i-confirm kon nabaton ninyo",
+    "naitulodon — pangngaasiyo ta i-confirm no naawatyo",
+  ],
+  completed: ["tapos na", "nahuman na", "natapos na", "nalpasen"],
+  cancelled: ["kinansela", "gikansela", "ginkansela", "nakansela"],
+};
+
 const ORDER_SELECT = `
   SELECT o.*, f.name AS farmer_name, f.phone_number AS farmer_phone, f.barangay AS farmer_barangay,
          s.name AS supplier_name, s.phone AS supplier_phone, s.barangay AS supplier_barangay, s.municipality AS supplier_municipality,
@@ -123,7 +136,9 @@ async function updateOrderStatus({ order_id, actor_type, actor_id, status, deliv
   if (status === "completed") award(order.farmer_id, "order_completed", order.id);
 
   // Tell the other side (both, when staff acted).
-  const message = `Order ${order.code} (${order.quantity} ${order.unit || ""} ${order.product_name}) ${STATUS_TEXT[status]}.`;
+  const what = `Order ${order.code} (${order.quantity} ${order.unit || ""} ${order.product_name})`;
+  const message = `${what} ${STATUS_TEXT[status]}.`;
+  const [tl, bis, hil, ilo] = FARMER_STATUS_TEXT[status].map((s) => `[AgriConnect] ${what}: ${s}.`);
   if (actor_type !== "farmer") {
     await notify({
       recipient_type: "farmer",
@@ -132,7 +147,7 @@ async function updateOrderStatus({ order_id, actor_type, actor_id, status, deliv
       title: `Order ${order.code}: ${status.replace("_", " ")}`,
       body: message,
       link: `#/orders/${order.id}`,
-      text: `[AgriConnect] ${message}`,
+      text: { tl, bis, hil, ilo, en: `[AgriConnect] ${message}` },
     });
   }
   if (actor_type !== "supplier") {

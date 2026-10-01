@@ -3,16 +3,20 @@ const { participantKey, publish } = require("../realtime/hub");
 const { sendSms, sendToChannel } = require("./sms.service");
 const { badRequest } = require("../utils/errors");
 const { money, perUnit } = require("../utils/format");
+const { say } = require("./nlp/i18n");
 
 const RECIPIENT_TYPES = ["farmer", "supplier"];
 const STAFF_KEY = "staff:all";
 
 /**
  * Text a farmer on the channel they can receive: SMS if they have a phone
- * number, else Messenger, else the website chat. Never throws (the transport logs failures).
+ * number, else Messenger, else the website chat. `body` is a string or
+ * translations { tl, bis, hil, ilo, en }, sent in the farmer's language.
+ * Never throws (the transport logs failures).
  */
-async function textFarmer(farmer, body, { request_id = null } = {}) {
+async function textFarmer(farmer, text, { request_id = null } = {}) {
   if (!farmer) return null;
+  const body = typeof text === "string" ? text : say(farmer.language, text);
   if (farmer.phone_number) return sendSms({ to: farmer.phone_number, body, farmer_id: farmer.id, request_id });
   if (farmer.messenger_psid) {
     return sendToChannel({ channel: "messenger", to: farmer.messenger_psid, body, farmer_id: farmer.id, request_id });
@@ -25,7 +29,8 @@ async function textFarmer(farmer, body, { request_id = null } = {}) {
 
 /**
  * Record a bell notification, push it live to the recipient's open tabs, and
- * optionally text them (`text`). Failures to text are logged, never thrown.
+ * optionally text them (`text`: a string, or translations for a farmer — see
+ * textFarmer). Failures to text are logged, never thrown.
  */
 async function notify({ recipient_type, recipient_id, kind, title, body = null, link = null, text = null }) {
   if (!RECIPIENT_TYPES.includes(recipient_type)) throw badRequest("Invalid recipient_type");
@@ -119,6 +124,16 @@ async function notifyFarmersOfOffer(offerId) {
     .all(offer.product_name, offer.barangay);
 
   const price = `${money(offer.price_per_unit)}/${perUnit(offer.demand_unit)}`;
+  const p = offer.product_name;
+  const from = offer.supplier_name;
+  const d = offer.proposed_delivery_date;
+  const text = {
+    tl: `[AgriConnect] May bagong alok para sa ${p}: ${price} mula sa ${from}${d ? `, ide-deliver ${d}` : ""}. Buksan ang AgriConnect para tanggapin.`,
+    bis: `[AgriConnect] Naay bag-ong tanyag para sa ${p}: ${price} gikan sa ${from}${d ? `, ihatod ${d}` : ""}. Ablihi ang AgriConnect aron dawaton.`,
+    hil: `[AgriConnect] May bag-o nga tanyag para sa ${p}: ${price} halin sa ${from}${d ? `, ihatod ${d}` : ""}. Buksi ang AgriConnect para batunon.`,
+    ilo: `[AgriConnect] Adda baro nga idiaya para iti ${p}: ${price} manipud iti ${from}${d ? `, maitulod ${d}` : ""}. Lukatan ti AgriConnect tapno awaten.`,
+    en: `[AgriConnect] New group offer for ${p}: ${price} from ${from}${d ? `, delivery ${d}` : ""}. Open AgriConnect to accept.`,
+  };
   for (const farmer of farmers) {
     await notify({
       recipient_type: "farmer",
@@ -127,9 +142,7 @@ async function notifyFarmersOfOffer(offerId) {
       title: `Group offer for ${offer.product_name}`,
       body: `${offer.supplier_name} offers ${price} to farmers in Brgy. ${offer.barangay}`,
       link: `#/requests/${farmer.request_id}`,
-      text:
-        `[AgriConnect] May bagong alok para sa ${offer.product_name}: ${price} mula sa ${offer.supplier_name}` +
-        `${offer.proposed_delivery_date ? `, deliver ${offer.proposed_delivery_date}` : ""}. Buksan ang AgriConnect para tanggapin.`,
+      text,
     });
   }
   return { notified: farmers.length };

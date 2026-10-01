@@ -71,6 +71,27 @@ const TEST_SET = [
   ["hindi pa rin dumarating after 1 week", "complaint"], ["sira ang sako pagdating", "complaint"],
   ["kulang ng dalawang sako ang deliver", "complaint"], ["wrong product ang dumating", "complaint"],
   ["gusto ko mag reklamo", "complaint"],
+
+  // Hiligaynon
+  ["maayong hapon kamo tanan", "greeting"], ["salamat gid sa inyo", "thanks"], ["sige huo", "acknowledge"],
+  ["halong kamo dira", "goodbye"], ["mabakal ako sang tatlo ka sako abono", "order"], ["tagpila subong ang complete", "price"],
+  ["may ara pa bala kamo herbicide", "availability"], ["paano bala ako makaorder diri", "how_to_order"],
+  ["nagahatod bala kamo sa bialong", "delivery_area"], ["diin na bala ang amon order", "order_status"],
+  ["indi na lang, i-cancel na", "cancel_order"], ["pwede bala magbayad sa gcash", "payment"],
+  ["ano oras kamo nagabukas", "hours"], ["diin bala ang inyo tindahan", "location"],
+  ["sin-o bala ang inyo supplier", "suppliers"], ["ano ang bulong sa peste sang humay", "farming_advice"],
+  ["gusto ko makighambal sa staff", "talk_to_human"], ["kulang ang ginhatod nga sako", "complaint"],
+  // Ilocano
+  ["naimbag a bigat apo", "greeting"], ["agyamanak unay apo", "thanks"], ["wen, sige", "acknowledge"],
+  ["gumatangak ti dua a sako nga abono", "order"], ["mano ti complete ita", "price"],
+  ["adda pay kadi herbicideyo", "availability"], ["kasano ti agorder iti agriconnect", "how_to_order"],
+  ["ayanna ti orderko", "order_status"], ["ikanselyo ti order ko", "cancel_order"], ["kasano ti agbayad iti gcash", "payment"],
+  ["sadino ti tiendayo", "location"], ["ania ti nasayaat nga abono iti mais", "farming_advice"],
+  ["kayatko ti makisarita iti staff", "talk_to_human"], ["biddut ti naited nga produkto", "complaint"],
+  // Bikol, Waray, Kapampangan
+  ["dios mabalos sa tabang", "thanks"], ["magkano an complete ngunyan", "price"], ["sain na an delivery ko", "order_status"],
+  ["damo nga salamat ha iyo", "thanks"], ["mapalit ako hin duha ka sako urea", "order"],
+  ["dakal a salamat king saup", "thanks"], ["magkanu ing complete", "price"],
 ];
 
 module.exports = { TEST_SET: TEST_SET.map(([text, intent]) => ({ text, intent })) };

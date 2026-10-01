@@ -161,6 +161,10 @@ const INTENTS = {
   ],
 };
 
+// Hiligaynon, Ilocano, and other Philippine languages.
+const { REGIONAL_INTENTS } = require("./dataset-regional");
+for (const [intent, texts] of Object.entries(REGIONAL_INTENTS)) INTENTS[intent].push(...texts);
+
 const EXAMPLES = Object.entries(INTENTS).flatMap(([intent, texts]) => texts.map((text) => ({ text, intent })));
 
 module.exports = { INTENTS, EXAMPLES };

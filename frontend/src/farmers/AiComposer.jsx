@@ -14,7 +14,11 @@ const EXAMPLES = [
   { lang: "English", text: "Need 3 sacks chicken feed and 2 bottles insecticide next week" },
 ];
 
-const LANGUAGE_LABEL = { tagalog: "Tagalog", bisaya: "Bisaya", english: "English", mixed: "Mixed", other: "Unclear" };
+const LANGUAGE_LABEL = {
+  tagalog: "Tagalog", bisaya: "Bisaya", hiligaynon: "Hiligaynon", ilocano: "Ilocano", english: "English",
+  bikol: "Bikol", waray: "Waray", kapampangan: "Kapampangan", pangasinan: "Pangasinan", maguindanaon: "Maguindanaon",
+  mixed: "Mixed", other: "Unclear",
+};
 const UNITS = ["sacks", "bags", "kg", "liters", "bottles", "packs"];
 
 const SpeechRecognition = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);

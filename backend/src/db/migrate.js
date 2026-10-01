@@ -25,6 +25,7 @@ const ADDED_COLUMNS = [
   ["farm_input_requests", "inbound_message_id", "INTEGER REFERENCES inbound_messages(id)"],
   ["sms_messages", "channel", "TEXT NOT NULL DEFAULT 'sms'"], // the log also holds Messenger texts
   ["farmers", "web_chat_id", "TEXT"], // browser id of a farmer who registered in the website chat
+  ["farmers", "language", "TEXT"], // language they text in (nlp/i18n.js); alerts are sent in it
 ];
 
 // Indexes on added columns can only be created after the columns exist.

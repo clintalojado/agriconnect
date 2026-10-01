@@ -9,10 +9,41 @@ const { notify, textFarmer, notifyStaff } = require("./notifications.service");
 const { getProvider } = require("./sms/providers");
 const { badRequest } = require("../utils/errors");
 
+// `text` is texted to the farmer in their language (see textFarmer).
 const DECISIONS = {
-  approved: { status: "verified", title: "Your profile is verified", text: "Verified na ang iyong AgriConnect profile! Ipapadala na sa mga supplier ang iyong mga request." },
-  rejected: { status: "rejected", title: "Your profile was not approved", text: "Hindi na-verify ang iyong AgriConnect profile." },
-  more_info: { status: "more_info", title: "More information needed", text: "Kailangan pa ng dagdag na impormasyon para ma-verify ang iyong AgriConnect profile." },
+  approved: {
+    status: "verified",
+    title: "Your profile is verified",
+    text: {
+      tl: "Verified na ang iyong AgriConnect profile! Ipapadala na sa mga supplier ang iyong mga request.",
+      bis: "Verified na ang imong AgriConnect profile! Ipadala na sa mga supplier ang imong mga request.",
+      hil: "Verified na ang inyo AgriConnect profile! Ipadala na sa mga supplier ang inyo mga request.",
+      ilo: "Verified ti AgriConnect profileyo! Maipatulodton kadagiti supplier dagiti requestyo.",
+      en: "Your AgriConnect profile is verified! Your requests now go to suppliers.",
+    },
+  },
+  rejected: {
+    status: "rejected",
+    title: "Your profile was not approved",
+    text: {
+      tl: "Hindi na-verify ang iyong AgriConnect profile.",
+      bis: "Wala na-verify ang imong AgriConnect profile.",
+      hil: "Wala na-verify ang inyo AgriConnect profile.",
+      ilo: "Saan a na-verify ti AgriConnect profileyo.",
+      en: "Your AgriConnect profile was not verified.",
+    },
+  },
+  more_info: {
+    status: "more_info",
+    title: "More information needed",
+    text: {
+      tl: "Kailangan pa ng dagdag na impormasyon para ma-verify ang iyong AgriConnect profile.",
+      bis: "Kinahanglan pa og dugang nga impormasyon aron ma-verify ang imong AgriConnect profile.",
+      hil: "Kinahanglan pa sang dugang nga impormasyon para ma-verify ang inyo AgriConnect profile.",
+      ilo: "Kasapulan pay ti nayon nga impormasion tapno ma-verify ti AgriConnect profileyo.",
+      en: "We need more information to verify your AgriConnect profile.",
+    },
+  },
 };
 
 async function decideFarmerVerification({ farmer_id, decision, verifier_name, note }) {
@@ -43,7 +74,7 @@ async function decideFarmerVerification({ farmer_id, decision, verifier_name, no
     title: rule.title,
     body: cleanNote || (decision === "approved" ? "Suppliers can now see and quote on your requests." : null),
     link: "#/settings",
-    text: `[AgriConnect] ${rule.text}${cleanNote ? ` ${cleanNote}` : ""}`,
+    text: Object.fromEntries(Object.entries(rule.text).map(([k, t]) => [k, `[AgriConnect] ${t}${cleanNote ? ` ${cleanNote}` : ""}`])),
   });
 
   const released = decision === "approved" ? await releaseHeldRequests(farmer.id) : 0;
@@ -64,7 +95,13 @@ async function sendOtp(farmerId) {
   const { farmer, code, ttl_minutes } = createOtp(farmerId);
   const sms = await textFarmer(
     { ...farmer, messenger_psid: null }, // the code must go to the phone being proven
-    `Ang iyong AgriConnect code ay ${code}. Valid ng ${ttl_minutes} minuto. Huwag itong ibigay sa iba.`
+    {
+      tl: `Ang iyong AgriConnect code ay ${code}. Valid ng ${ttl_minutes} minuto. Huwag itong ibigay sa iba.`,
+      bis: `Ang imong AgriConnect code kay ${code}. Valid sulod sa ${ttl_minutes} ka minuto. Ayaw kini ihatag sa uban.`,
+      hil: `Ang inyo AgriConnect code amo ang ${code}. Valid sa sulod sang ${ttl_minutes} ka minuto. Indi ini paghatag sa iban.`,
+      ilo: `Ti AgriConnect codeyo ket ${code}. Valid iti ${ttl_minutes} a minuto. Dimo daytoy nga ited iti sabali.`,
+      en: `Your AgriConnect code is ${code}. Valid for ${ttl_minutes} minutes. Don't share it with anyone.`,
+    }
   );
   return {
     sent: sms?.status === "sent",

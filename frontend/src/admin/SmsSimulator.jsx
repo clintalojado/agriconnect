@@ -10,7 +10,10 @@ import { MessengerIcon, RefreshIcon, SendIcon, SmsIcon, SparkleIcon } from "../c
 const SAMPLES = [
   "Sir, palit ko 5 sako urea ug 2 sako abono. Pwede delivery sa Brgy. Katipunan mga next week?",
   "Pa order 3 sako feeds para sa manok. Pwede hatod karong Sabado?",
+  "Maayong aga, mabakal ako sang lima ka sako nga urea buwas",
+  "Naimbag a bigat, gumatangak ti tallo a sako nga abono",
   "OO",
+  "tagpila ang abono subong?",
   "magkano po ang urea?",
   "gusto ko ng urea",
   "STATUS",
@@ -18,6 +21,14 @@ const SAMPLES = [
 ];
 
 const DEFAULT_SENDER = { sms: "09171234567", messenger: "PSID-DEMO-1" };
+
+// The farmer's language; Bikol, Waray, Kapampangan, Pangasinan, and
+// Maguindanaon texts are understood and answered in Tagalog.
+const LANGUAGE_LABEL = {
+  tagalog: "Tagalog", bisaya: "Bisaya", hiligaynon: "Hiligaynon", ilocano: "Ilocano", english: "English",
+  bikol: "Bikol (reply in Tagalog)", waray: "Waray (reply in Tagalog)", kapampangan: "Kapampangan (reply in Tagalog)",
+  pangasinan: "Pangasinan (reply in Tagalog)", maguindanaon: "Maguindanaon (reply in Tagalog)",
+};
 
 function PhoneThread({ messages, channel }) {
   const scrollRef = useRef(null);
@@ -184,6 +195,7 @@ export default function SmsSimulator() {
             ) : (
               <div className="mt-4 space-y-3 text-sm">
                 <div className="flex flex-wrap gap-1.5">
+                  {last.language && <Badge tone="blue">Language: {LANGUAGE_LABEL[last.language] || last.language}</Badge>}
                   {last.registration && <Badge tone="violet">Registration: {last.registration.replace("_", " ")}</Badge>}
                   {last.farmer && <Badge tone="stone">Farmer #{last.farmer.id} · {last.farmer.verification_status}</Badge>}
                   {last.inbound && <StatusBadge map={INBOUND_STATUS} status={last.inbound.status} />}

@@ -5,6 +5,7 @@ const { extractWithRules, isoDate } = require("./nlp/rules");
 const { canonicalProduct, canonicalUnit } = require("./nlp/lexicon");
 const { confirmationReply, clarificationQuestion, intentReply } = require("./nlp/replies");
 const { MLANG_BARANGAYS, canonicalBarangay } = require("./locations");
+const { LANGUAGE_CODES } = require("./nlp/i18n");
 
 // NLP_MODE:
 //   auto  (default) — Claude API, falling back to the offline rule-based parser
@@ -23,7 +24,7 @@ const ExtractionSchema = z.object({
   preferred_date: z.string().nullable(),
   preferred_date_iso: z.string().nullable(),
   intent: z.enum(["purchase_request", "inquiry", "other"]),
-  language: z.enum(["tagalog", "bisaya", "english", "mixed", "other"]),
+  language: z.enum([...LANGUAGE_CODES, "mixed", "other"]),
   additional_items: z.array(
     z.object({
       product_name: z.string(),
@@ -42,11 +43,11 @@ const ExtractionSchema = z.object({
   }),
 });
 
-const SYSTEM_PROMPT = `You extract structured farm-input order details from informal messages written by small-scale Filipino farmers, sent through a web form or by SMS. Messages may be in Tagalog, Bisaya/Cebuano, informal English, or a mix, and often contain misspellings, text-speak ("pls", "kc", "2mrw"), and little punctuation.
+const SYSTEM_PROMPT = `You extract structured farm-input order details from informal messages written by small-scale Filipino farmers, sent through a web form or by SMS. Messages may be in Tagalog, Bisaya/Cebuano, Hiligaynon/Ilonggo, Ilocano, Bikol, Waray, Kapampangan, Pangasinan, Maguindanaon, informal English, or a mix, and often contain misspellings, text-speak ("pls", "kc", "2mrw"), and little punctuation.
 
 Fields:
 - product_name: the main farm input requested. Use these canonical names when they apply: "Urea (46-0-0)", "Complete fertilizer (14-14-14)", "Ammonium sulfate (21-0-0)", "Ammophos (16-20-0)", "Muriate of potash (0-0-60)", "Organic fertilizer", "Hybrid corn seeds", "Rice seeds", "Herbicide", "Insecticide", "Fungicide", "Hog grower feed", "Chicken feed". Otherwise a short clean product name. Null if none is mentioned.
-- quantity: the numeric amount of the main product, converting number words (e.g. "sampung" = 10, "napulo" = 10, "lima" = 5). Null if not stated.
+- quantity: the numeric amount of the main product, converting number words (e.g. "sampung" = 10, "napulo" = 10, "lima" = 5, "tallo" = 3, "atlung" = 3). Null if not stated.
 - unit: one of "sacks", "kg", "liters", "bottles", "packs" when it fits ("sako", "bag", "kaban" → "sacks"; "kilo" → "kg"; "litro" → "liters"), otherwise the stated unit. If a fertilizer count has no unit, use "sacks". Null if not stated and not inferable.
 - barangay: the barangay named in the message. Null if not stated (do not guess from the farmer's profile — that is filled in separately). Most farmers are in M'lang, Cotabato; when the message names one of its barangays (even misspelled or without "brgy"), use its official spelling: ${MLANG_BARANGAYS.join(", ")}.
 - preferred_date: the requested timing, kept close to the farmer's phrasing (e.g. "before May", "sunod buwan"). Null if not stated.
@@ -55,7 +56,7 @@ Fields:
 - language: the main language of the message; "mixed" when two languages carry roughly equal weight.
 - additional_items: any other products requested in the same message besides the main one (empty list if none).
 - clarification_question: when intent is "purchase_request" but product_name, quantity, or unit is missing, one short friendly question in the farmer's language asking for exactly what is missing. Otherwise null.
-- reply_message: a reply of at most 300 characters in the farmer's language (use Tagalog for mixed messages), polite and plain, suitable for SMS. For a complete purchase request, restate the order and say suppliers will be notified. For an incomplete one, it is the clarification question. For an inquiry, acknowledge it and say prices will be checked. Never promise a price, stock, or delivery date.
+- reply_message: a reply of at most 300 characters in the farmer's language when it is Tagalog, Bisaya, Hiligaynon, Ilocano, or English; in Tagalog for every other language and for mixed messages. Polite and plain, suitable for SMS. For a complete purchase request, restate the order and say suppliers will be notified. For an incomplete one, it is the clarification question. For an inquiry, acknowledge it and say prices will be checked. Never promise a price, stock, or delivery date.
 - confidence: a 0-1 score per field (product_name, quantity, unit, barangay, preferred_date): near 1.0 for explicit unambiguous values, lower for inferred or ambiguous ones, near 0 when the field is null.
 
 Examples:
