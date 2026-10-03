@@ -6,6 +6,7 @@ const crypto = require("crypto");
 const express = require("express");
 const { handleInbound } = require("../services/inbound.service");
 const { showTyping, GET_STARTED } = require("../services/messenger/provider");
+const { ORDER_PAYLOAD, PRICES_PAYLOAD } = require("../services/nlp/prices");
 
 const router = express.Router();
 
@@ -31,6 +32,16 @@ function validSignature(req) {
   return given.length === expected.length && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected));
 }
 
+// Button taps, read as if the farmer had typed them. The product name holds
+// no language-specific words, so replies stay in the farmer's language.
+function postbackText(payload) {
+  if (!payload) return null;
+  if (payload === GET_STARTED) return "Hello";
+  if (payload.startsWith(ORDER_PAYLOAD)) return `order ${payload.slice(ORDER_PAYLOAD.length)}`;
+  if (payload.startsWith(PRICES_PAYLOAD)) return `presyo ${payload.slice(PRICES_PAYLOAD.length)}`;
+  return null;
+}
+
 router.post("/webhook", (req, res) => {
   if (!validSignature(req)) {
     console.warn("[messenger] webhook rejected: bad X-Hub-Signature-256 — check MESSENGER_APP_SECRET is the App secret (App settings → Basic), not the App ID");
@@ -50,7 +61,7 @@ router.post("/webhook", (req, res) => {
   for (const entry of body.entry || []) {
     for (const event of entry.messaging || []) {
       // Tapping "Get Started" (or a button) arrives as a postback, not a message.
-      const text = event.postback?.payload === GET_STARTED ? "Hello" : event.message?.text;
+      const text = postbackText(event.postback?.payload) ?? event.message?.text;
       if (!text || event.message?.is_echo || !event.sender?.id) continue;
       showTyping(event.sender.id);
       handleInbound({ channel: "messenger", sender: event.sender.id, text }).catch((error) =>

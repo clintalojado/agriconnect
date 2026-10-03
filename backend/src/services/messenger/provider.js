@@ -37,6 +37,25 @@ async function sendMessengerText(psid, text) {
   });
 }
 
+// A swipeable row of cards (Messenger "generic template"): photo, title,
+// subtitle, and up to 3 buttons each. Used for store prices.
+async function sendMessengerCards(psid, elements) {
+  if (!isConfigured()) {
+    console.log(`[messenger:console] -> ${psid}: [${elements.length} cards] ${elements.map((e) => e.title).join(" | ")}`);
+    return;
+  }
+  await callSendApi({
+    recipient: { id: psid },
+    messaging_type: "RESPONSE",
+    message: {
+      attachment: {
+        type: "template",
+        payload: { template_type: "generic", image_aspect_ratio: "square", elements: elements.slice(0, 10) },
+      },
+    },
+  });
+}
+
 // "Seen" + "typing…" while the message is being read, so the farmer knows a
 // reply is coming. Best effort: a failure here never blocks the reply.
 async function showTyping(psid) {
@@ -79,4 +98,4 @@ async function setupMessengerProfile() {
   }
 }
 
-module.exports = { sendMessengerText, showTyping, isConfigured, setupMessengerProfile, GET_STARTED };
+module.exports = { sendMessengerText, sendMessengerCards, showTyping, isConfigured, setupMessengerProfile, GET_STARTED };

@@ -15,6 +15,7 @@ const { say } = require("./nlp/i18n");
 const { describeOrder } = require("./nlp/replies");
 const { classifyIntent } = require("./nlp/intent");
 const { answerIntent, fallbackReply, KB_INTENTS } = require("./nlp/knowledge");
+const { productPrices } = require("./nlp/prices");
 const {
   findOrCreateFarmer,
   findFarmerByPhone,
@@ -25,13 +26,12 @@ const {
 } = require("./farmers.service");
 const { createStructuredRequest, getRequestsByFarmer } = require("./requests.service");
 const { findProductByName } = require("./catalog.service");
-const { sendToChannel, logInbound, CHANNELS } = require("./sms.service");
+const { sendToChannel, sendCards, logInbound, CHANNELS } = require("./sms.service");
 const { notifyStaff } = require("./notifications.service");
 const { sendOtp } = require("./verification.service");
 const { normalizePhone } = require("../utils/phone");
 const { canonicalBarangay, findBarangayInText } = require("./locations");
 const { badRequest, notFound } = require("../utils/errors");
-const { money, perUnit } = require("../utils/format");
 
 // Yes/no in each language: oo/opo, huo (Hiligaynon), wen (Ilocano), iyo (Bikol),
 // uway (Maguindanaon), on (Pangasinan), wa (Kapampangan); hindi/dili/indi,
@@ -260,36 +260,12 @@ function publishedReply(language, items, farmer) {
   });
 }
 
-function bestPriceReply(structured, farmer) {
-  const db = getDb();
-  const name = structured.items[0]?.product_name;
-  const listing = db
-    .prepare(
-      `SELECT sp.price, sp.unit, s.name AS supplier_name
-       FROM supplier_products sp
-       JOIN products p ON p.id = sp.product_id
-       JOIN suppliers s ON s.id = sp.supplier_id
-       WHERE p.name = ? AND sp.in_stock = 1 AND s.verified = 1
-       ORDER BY sp.price ASC LIMIT 1`
-    )
-    .get(name);
-  if (!listing) {
-    return say(structured.language, {
-      tl: `Wala pang supplier na naglista ng ${name}. I-text ang dami para humingi ng quote, hal. "5 sako".`,
-      bis: `Wala pay supplier nga naglista sa ${name}. I-text ang gidaghanon aron mangayo og quote, pananglitan "5 ka sako".`,
-      hil: `Wala pa sang supplier nga naglista sang ${name}. I-text ang kadamuon para mangayo sang quote, pareho sang "5 ka sako".`,
-      ilo: `Awan pay ti supplier a nangilista iti ${name}. I-text ti kaadu tapno agkiddaw iti quote, kas iti "5 a sako".`,
-      en: `No supplier lists ${name} yet. Text the quantity to ask for quotations, e.g. "5 sacks".`,
-    });
-  }
-  const price = `${money(listing.price)}/${perUnit(listing.unit)}`;
-  const supplier = listing.supplier_name;
-  return say(structured.language, {
-    tl: `Pinakamababang presyo ng ${name}: ${price} mula sa ${supplier}. I-text ang dami para mag-request, hal. "5 sako ${name}".`,
-    bis: `Pinakaubos nga presyo sa ${name}: ${price} gikan sa ${supplier}. I-text ang gidaghanon aron mo-request, pananglitan "5 ka sako".`,
-    hil: `Pinakamanubo nga presyo sang ${name}: ${price} halin sa ${supplier}. I-text ang kadamuon para mag-request, pareho sang "5 ka sako".`,
-    ilo: `Kalaklaka a presyo ti ${name}: ${price} manipud iti ${supplier}. I-text ti kaadu tapno agrequest, kas iti "5 a sako".`,
-    en: `Lowest price for ${name}: ${price} from ${supplier}. Text the quantity to request it, e.g. "5 sacks".`,
+// "Magkano ang urea?": every store's price and who delivers to the farmer's
+// barangay (the barangay in the message, else their own). { reply, cards, cardsReply }
+function priceAnswer(structured, farmer) {
+  return productPrices(structured.items[0]?.product_name, {
+    language: structured.language,
+    barangay: structured.barangay || farmer.barangay,
   });
 }
 
@@ -400,6 +376,15 @@ function isGuestQuestion(text) {
 // ("kulang ng 2 sako ang deliver" is a complaint, not an order).
 const OVERRIDE_INTENTS = new Set(["complaint", "cancel_order", "order_status", "talk_to_human"]);
 
+// Adds text after a reply, and after the short Messenger text that goes with cards.
+function withSuffix(outcome, suffix) {
+  return {
+    ...outcome,
+    reply: outcome.reply + suffix,
+    ...(outcome.cardsReply ? { cardsReply: outcome.cardsReply + suffix } : {}),
+  };
+}
+
 /**
  * Answers a question from the knowledge base as its own inbox entry, leaving
  * any open order conversation untouched. Complaints, cancellations, requests
@@ -418,7 +403,7 @@ function answerFromKnowledge({ farmer, channel, sender, text, ml, language }) {
     structured: { items: [], intent: ml.intent, language, source: "ml", confidence: ml.confidence, ml },
     status: answer.escalate ? "new" : "answered",
   });
-  return { inbound, reply: answer.reply, intent: ml };
+  return { inbound, reply: answer.reply, cards: answer.cards, cardsReply: answer.cardsReply, intent: ml };
 }
 
 async function processOrderText({ farmer, channel, sender, text, open, language }) {
@@ -444,10 +429,12 @@ async function processOrderText({ farmer, channel, sender, text, open, language 
   if (ml.understood && OVERRIDE_INTENTS.has(ml.intent) && ml.confidence >= 0.45 && !correction) {
     return { ...answerFromKnowledge({ farmer, channel, sender, text, ml, language }), extraction };
   }
-  // A question in the middle of an order ("magkano delivery?" before OO):
-  // answer it and remind the farmer about the pending order, without merging.
+  // A question in the middle of an order ("magkano delivery?", "magkano ang
+  // urea?" before OO): answer it and remind the farmer about the pending
+  // order, without merging.
   const questionIntent = ml.understood && KB_INTENTS.has(ml.intent) && !["order", "acknowledge"].includes(ml.intent);
-  if (merging && questionIntent && !mentionsOrder(text)) {
+  const priceQuestion = ["price", "availability"].includes(ml.intent) && !correction;
+  if (merging && questionIntent && (!mentionsOrder(text) || priceQuestion)) {
     const answered = answerFromKnowledge({ farmer, channel, sender, text, ml, language });
     const reminder = open.status === "awaiting_confirmation"
       ? say(language, {
@@ -458,15 +445,18 @@ async function processOrderText({ farmer, channel, sender, text, open, language 
           en: "\n\nReminder: reply YES to confirm your order.",
         })
       : `\n\n${missingQuestion({ items: [], ...decodeRow(open).extraction, language }) || ""}`.trimEnd();
-    return { ...answered, reply: answered.reply + reminder, extraction };
+    return { ...withSuffix(answered, reminder), extraction };
   }
 
   let status;
   let reply;
   const advisory = ml.understood && KB_INTENTS.has(ml.intent) && !["price", "availability", "order"].includes(ml.intent);
   if (hasProduct && !hasQuantity && !advisory && (["price", "availability"].includes(ml.intent) || structured.intent === "inquiry")) {
-    status = "answered";
-    reply = bestPriceReply(structured, farmer);
+    // A price question is its own inbox entry; an open order stays as it was.
+    const asked = merging ? toStructured(await extractFarmInputRequest(text, { profileBarangay: farmer.barangay })) : structured;
+    const prices = priceAnswer({ ...asked, items: asked.items.length ? asked.items : structured.items, language }, farmer);
+    const inbound = saveInbound({ channel, sender, farmer_id: farmer.id, body: text, structured: { ...asked, language }, status: "answered" });
+    return { inbound, ...prices, extraction };
   } else if (!hasQuantity && ml.understood && KB_INTENTS.has(ml.intent) && !(hasProduct && ml.intent === "order")) {
     return { ...answerFromKnowledge({ farmer, channel, sender, text, ml, language }), extraction };
   } else if (!hasProduct && structured.intent !== "purchase_request" && ml.intent !== "order") {
@@ -911,16 +901,14 @@ async function handleInbound({ channel, sender, text }) {
     // A question from someone not registered yet: answer it, then invite them.
     const ml = classifyIntent(message);
     const answered = answerFromKnowledge({ farmer: null, channel, sender: from, text: message, ml, language });
-    outcome = {
-      ...answered,
-      reply: `${answered.reply}\n\n${say(language, {
-        tl: "Para makapag-order, mag-register muna: i-text ang REG Pangalan, Barangay, Bayan (hal. REG Juan Dela Cruz, Katipunan, M'lang).",
-        bis: "Aron maka-order, pag-register una: i-text ang REG Ngalan, Barangay, Lungsod (pananglitan REG Juan Dela Cruz, Katipunan, M'lang).",
-        hil: "Para makaorder, magparehistro anay: i-text ang REG Ngalan, Barangay, Banwa (pareho sang REG Juan Dela Cruz, Katipunan, M'lang).",
-        ilo: "Tapno makaorder, agparehistro pay: i-text ti REG Nagan, Barangay, Ili (kas iti REG Juan Dela Cruz, Katipunan, M'lang).",
-        en: "To order, register first: text REG Name, Barangay, Town (e.g. REG Juan Dela Cruz, Katipunan, M'lang).",
-      })}`,
-    };
+    const invite = say(language, {
+      tl: "Para makapag-order, mag-register muna: i-text ang REG Pangalan, Barangay, Bayan (hal. REG Juan Dela Cruz, Katipunan, M'lang).",
+      bis: "Aron maka-order, pag-register una: i-text ang REG Ngalan, Barangay, Lungsod (pananglitan REG Juan Dela Cruz, Katipunan, M'lang).",
+      hil: "Para makaorder, magparehistro anay: i-text ang REG Ngalan, Barangay, Banwa (pareho sang REG Juan Dela Cruz, Katipunan, M'lang).",
+      ilo: "Tapno makaorder, agparehistro pay: i-text ti REG Nagan, Barangay, Ili (kas iti REG Juan Dela Cruz, Katipunan, M'lang).",
+      en: "To order, register first: text REG Name, Barangay, Town (e.g. REG Juan Dela Cruz, Katipunan, M'lang).",
+    });
+    outcome = withSuffix(answered, `\n\n${invite}`);
   } else if (!farmer) {
     // BPMN: not registered → start the registration conversation, keeping the first text.
     saveSession(channel, from, { step: "name", data: {}, pending_message: message });
@@ -986,11 +974,17 @@ async function handleInbound({ channel, sender, text }) {
   if (farmer && farmer.language !== language) {
     getDb().prepare("UPDATE farmers SET language = ? WHERE id = ?").run(language, farmer.id);
   }
-  const reply = await sendToChannel({ channel, to: from, body: outcome.reply, farmer_id: farmer?.id ?? null });
+  // Messenger shows prices as photo cards with a short text; SMS and the
+  // website chat get the full text.
+  const withCards = channel === "messenger" && outcome.cards?.length > 0;
+  const body = withCards ? outcome.cardsReply || outcome.reply : outcome.reply;
+  const reply = await sendToChannel({ channel, to: from, body, farmer_id: farmer?.id ?? null });
+  if (withCards) await sendCards({ to: from, cards: outcome.cards, farmer_id: farmer?.id ?? null });
   if (outcome.inbound) notifyStaff("inbound", { id: outcome.inbound.id, status: outcome.inbound.status });
 
   return {
     reply,
+    cards: withCards ? outcome.cards : [],
     farmer: farmer || null,
     inbound: outcome.inbound || null,
     requests: outcome.requests || [],

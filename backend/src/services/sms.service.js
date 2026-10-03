@@ -3,7 +3,7 @@
 
 const { getDb } = require("../db/connection");
 const { getProvider } = require("./sms/providers");
-const { sendMessengerText } = require("./messenger/provider");
+const { sendMessengerText, sendMessengerCards } = require("./messenger/provider");
 const { normalizePhone } = require("../utils/phone");
 const { badRequest } = require("../utils/errors");
 
@@ -57,6 +57,23 @@ async function sendToChannel({ channel, to, body, farmer_id = null, request_id =
   }
 }
 
+/**
+ * Messenger only: send photo cards (see nlp/prices.js). The log keeps a text
+ * line per card so the staff simulator and inbox show what was sent.
+ * Same never-throws contract as sendSms.
+ */
+async function sendCards({ to, cards, farmer_id = null }) {
+  const body = cards.map((c) => `🖼 ${c.title}\n${c.subtitle}`).join("\n\n");
+  const entry = { channel: "messenger", direction: "outbound", phone: to, body, provider: "messenger", farmer_id };
+  try {
+    await sendMessengerCards(to, cards);
+    return logMessage({ ...entry, status: "sent" });
+  } catch (error) {
+    console.error(`[messenger] cards to ${to} failed: ${error.message}`);
+    return logMessage({ ...entry, status: "failed", error: error.message });
+  }
+}
+
 function logInbound({ channel, sender, body, farmer_id }) {
   return logMessage({
     channel,
@@ -86,4 +103,4 @@ function getSmsLog({ limit = 50, phone, channel } = {}) {
   return db.prepare(`SELECT * FROM sms_messages ${where} ORDER BY id DESC LIMIT ?`).all(...params, cappedLimit);
 }
 
-module.exports = { sendSms, sendToChannel, logInbound, getSmsLog, CHANNELS };
+module.exports = { sendSms, sendToChannel, sendCards, logInbound, getSmsLog, CHANNELS };

@@ -10,6 +10,8 @@ const { findBarangayInText, MUNICIPALITY } = require("../locations");
 const { getPoints } = require("../points.service");
 const { money, perUnit } = require("../../utils/format");
 const { say } = require("./i18n");
+const { canonicalProduct } = require("./lexicon");
+const { productPrices, priceList } = require("./prices");
 
 const ORDER_EXAMPLE = {
   tl: '"5 sako urea, sa Katipunan, sunod linggo"',
@@ -156,7 +158,9 @@ function farmingAdvice(text, language) {
 /**
  * @param intent   classifier intent
  * @param context  { text, language, farmer (row or null), statusReply(farmer, language) }
- * @returns { reply, escalate? } — escalate=true when staff should follow up.
+ * @returns { reply, escalate?, cards?, cardsReply? } — escalate=true when staff
+ *   should follow up; cards (Messenger photo cards) are sent with cardsReply
+ *   instead of reply on Messenger.
  */
 function answerIntent(intent, { text, language, farmer, statusReply }) {
   const name = farmer?.name?.split(" ")[0];
@@ -217,39 +221,14 @@ function answerIntent(intent, { text, language, farmer, statusReply }) {
       };
 
     case "price": {
-      const tags = ["Urea (46-0-0)", "Complete fertilizer (14-14-14)", "Rice seeds", "Hybrid corn seeds", "Chicken feed"].map(priceTag).filter(Boolean);
-      if (!tags.length) {
-        return {
-          reply: say(language, {
-            tl: "Wala pang nakalistang presyo. I-text ang produkto at dami para humingi ng quote.",
-            bis: "Wala pay presyo nga nakalista. I-text ang produkto ug gidaghanon aron mangayo og quote.",
-            hil: "Wala pa sang presyo nga nakalista. I-text ang produkto kag kadamuon para mangayo sang quote.",
-            ilo: "Awan pay ti nailista a presyo. I-text ti produkto ken kaadu tapno agkiddaw iti quote.",
-            en: "No prices listed yet. Text the product and quantity to ask for quotations.",
-          }),
-        };
-      }
-      return {
-        reply:
-          say(language, {
-            tl: "Pinakamababang presyo ngayon mula sa verified suppliers:",
-            bis: "Pinakaubos nga presyo karon gikan sa verified suppliers:",
-            hil: "Pinakamanubo nga presyo subong halin sa verified suppliers:",
-            ilo: "Kalaklaka a presyo ita manipud kadagiti verified supplier:",
-            en: "Lowest prices now from verified suppliers:",
-          }) +
-          `\n• ${tags.join("\n• ")}\n` +
-          say(language, {
-            tl: 'Itanong ang ibang produkto, hal. "magkano ang potash?"',
-            bis: 'Pangutana sa uban nga produkto, pananglitan "pila ang potash?"',
-            hil: 'Pamangkot sa iban nga produkto, pareho sang "tagpila ang potash?"',
-            ilo: 'Agdamag iti sabali a produkto, kas iti "mano ti potash?"',
-            en: 'Ask about any product, e.g. "how much is potash?"',
-          }),
-      };
+      // A product named → every store's price; otherwise the price list.
+      const product = canonicalProduct(text);
+      if (product) return productPrices(product.name, { language, barangay: farmer?.barangay });
+      return priceList({ language });
     }
 
     case "availability":
+      if (canonicalProduct(text)) return productPrices(canonicalProduct(text).name, { language, barangay: farmer?.barangay });
       return {
         reply: say(language, {
           tl: 'Aling produkto po? I-text ang pangalan, hal. "may urea ba?" o "magkano ang 14-14-14?"',
